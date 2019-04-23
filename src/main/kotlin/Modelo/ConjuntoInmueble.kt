@@ -5,29 +5,63 @@ import tech.tablesaw.api.Table
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-class ConjuntoInmueble {
 
-    private var modificado = false                      // Si el @ConjuntoInmueble a sido modificado
-    private lateinit var tipoActual: Class<*>           // Tipo de dato que se almacena en el dataframe
-    private lateinit var nomCols: List<String>          // Nombre de las columnas que almacena el dataframe
-    private lateinit var dataframe: Table               // Dataframe con los datos
-    private var yaExisteArchivo: Boolean = false;       // Comprobamos si el archivo ya ha sido creado
+class ConjuntoInmueble<T: Inmueble> {
 
-    constructor(listaInmuebles: List<Inmueble> = listOf(), guardadoAutomatico: Boolean = true, masOpciones: List<Pair<String, Any>>? = null){
+    private lateinit var tipoActual: Class<T>                       // Tipo de dato que se almacena en el dataframe
+    private lateinit var nomCols: List<String>                      // Nombre de las columnas que almacena el dataframe
+    private lateinit var dataframe: Table                           // Dataframe con los datos
+    private var yaExisteArchivo: Boolean = false;                   // Comprobamos si el archivo ya ha sido creado
+    var propiedadesConjuntoInmueble = PropiedadesConjuntoInmueble() // Creamos un conjunto de propiedades por defecto
 
-        // Hay inmuebles en la lista
-        if (listaInmuebles.size == 0){
+
+    companion object {
+
+        /**
+         * Creamos un {[ConjuntoInmuebleFactory]} del tipo necesitado
+         *
+         * @return {[ConjuntoInmuebleFactory]}
+         */
+        inline fun <reified T: Inmueble> create(listaInmueble: List<T>? = null, propiedadesConjuntoInmueble: PropiedadesConjuntoInmueble? = null): ConjuntoInmueble<T> = ConjuntoInmueble<T>(T::class.java, listaInmueble)
+
+        /**
+         * Creamos un {[ConjuntoInmuebleFactory]} del tipo necesitado
+         *
+         * @return {[ConjuntoInmuebleFactory]}
+         */
+        inline fun <reified T: Inmueble> create(block: (ConjuntoInmueble<T>) -> Unit): ConjuntoInmueble<T> {
+            val conjuntoInmueble = ConjuntoInmueble<T>(T::class.java)   // Creamos el ConjuntoInmueble
+            block(conjuntoInmueble)                                     // Dejamos que establezca las propiedades y demás atributos
+            return conjuntoInmueble                                     // Le devolvemos el ConjuntoInmueble ya modificado
+        }
+
+    }
+
+    constructor(clazz: Class<T>, listaInmuebles: List<T>? = null, propiedadesConjuntoInmueble: PropiedadesConjuntoInmueble? = null){
+
+        // Guardamos el tipo de datos que se almacenará
+        setTipoActual(clazz)
+
+        // Creamos un dataframe con los valores pasados
+        if (listaInmuebles != null && listaInmuebles.size > 0){
+            crearDataFrame(listaInmuebles)
+        }
+        // Creamos un data frame vacío
+        else{
             crearDataFrameVacio()
         }
+
+
     }
 
     /**
      * Creamos un dataframe con los datos del {[Inmueble]} que se esté almacenando
      */
-    fun crearDataFrameVacio(){
+    private fun crearDataFrameVacio(){
 
         dataframe = Table.create()
-        val lista = Inmueble.obtenerNombreTipoAtributos() // Nombre de los atributos y su tipo
+        val inmueble = tipoActual.newInstance()
+        val lista = inmueble.obtenerNombreTipoAtributos() // Nombre de los atributos y su tipo
 
         with(dataframe){
 
@@ -39,13 +73,48 @@ class ConjuntoInmueble {
             )
         }
 
+        dataframe.columns().forEach { println("Nueva columna con nombre ${it.name()} y tipo ${it.type()}") }
+
         // Establecemos los nombres de las columnas a los nombres de los atributos
         // de un "Inmueble"
-        setNomCols(Inmueble.obtenerNombreAtributos())
-
-        // Establecemos el tipo actual del dataframe para que sea de tipo "Inmueble"
-        setTipoActual(Class.forName(Inmueble::class.java.canonicalName))
+        setNomCols(inmueble.obtenerNombreAtributos())
     }
+
+    /**
+     * Creamos el dataframe y lo llenamos con los datos pasados por parámetro
+     *
+     * @param List<T> listaInmuebles: Lista de inmuebles a guardar
+     */
+    private fun crearDataFrame(listaInmuebles: List<T>){
+
+        crearDataFrameVacio()
+
+        if (listaInmuebles.size > 0){
+
+            val atributos = listaInmuebles.get(0).obtenerNombreAtributos()
+
+            // Recorremos cada uno de los inmuebles
+            listaInmuebles.forEach {inmueble ->
+
+                // Recorremos los atributos del inmueble
+                atributos.forEach { atributo ->
+
+                    val valor = obtenerValorAtributo(atributo,inmueble)
+                    dataframe.column(atributo).appendCell(valor)
+
+                }
+            }
+        }
+    }
+
+    private fun obtenerValorAtributo(atributo: String, inmueble: T): String {
+
+        val field = inmueble.javaClass.getDeclaredField(atributo)
+
+        field.isAccessible = true
+        return field.get(inmueble).toString()
+    }
+
 
     /**
      * Obtenemos un nombre por defecto para el archivo en caso de que no
@@ -63,7 +132,7 @@ class ConjuntoInmueble {
         this.nomCols = nomCols
     }
 
-    private fun setTipoActual(tipo: Class<*>){
+    private fun setTipoActual(tipo: Class<T>){
         this.tipoActual = tipo
     }
 

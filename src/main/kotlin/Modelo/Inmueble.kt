@@ -2,7 +2,7 @@ package Modelo
 
 import Utiles.TIPOS_CONTRATOS
 
-open class Inmueble() {
+open class Inmueble {
 
     private var calle: String = ""
     private var ciudad: String = ""
@@ -14,7 +14,9 @@ open class Inmueble() {
     private var urlDetalle: String = ""
 
 
-    constructor(calle: String, ciudad: String, m2: Int, precio: Double, moneda: String, contrato: TIPOS_CONTRATOS, numTelefono: String, urlDetalle: String) : this() {
+    constructor(){}
+
+    constructor(calle: String, ciudad: String, m2: Int, precio: Double, moneda: String, contrato: TIPOS_CONTRATOS, numTelefono: String, urlDetalle: String) {
         this.calle = calle
         this.ciudad = ciudad
         this.m2 = m2
@@ -25,29 +27,25 @@ open class Inmueble() {
         this.urlDetalle = urlDetalle
     }
 
-    companion object {
+    /**
+     * Devuelve los nombres de las variables almacenadas en el objeto (calle,ciudad,m2...ect)
+     *
+     * @return List<String> lista con los nombres de las variables
+     */
+    fun obtenerNombreAtributos(): List<String> {
+        return this.javaClass.declaredFields.map { it.name }
+    }
 
-        /**
-         * Devuelve los nombres de las variables almacenadas en el objeto (calle,ciudad,m2...ect)
-         *
-         * @return List<String> lista con los nombres de las variables
-         */
-        fun obtenerNombreAtributos(): List<String> {
-            return this.javaClass.declaredFields.map { it.name }
+    /**
+     * Devolvemos el nombre de las variables almacenadas en el objeto junto
+     * a su respectivo tipo
+     *
+     * @return List<Pair<String, Class<*>>> lista con el nombre de la variable y su tipo
+     */
+    fun obtenerNombreTipoAtributos(): List<Pair<String, Class<*>>>{
+        return this.javaClass.declaredFields.map {
+            Pair<String, Class<*>>(it.name, it.type)
         }
-
-        /**
-         * Devolvemos el nombre de las variables almacenadas en el objeto junto
-         * a su respectivo tipo
-         *
-         * @return List<Pair<String, Class<*>>> lista con el nombre de la variable y su tipo
-         */
-        fun obtenerNombreTipoAtributos(): List<Pair<String, Class<*>>>{
-            return this.javaClass.declaredFields.map {
-                Pair<String, Class<*>>(it.name, it.type)
-            }
-        }
-
     }
 
     override fun toString(): String {
