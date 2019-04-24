@@ -13,7 +13,6 @@ open class Inmueble {
     private var numTelefono: String = ""
     private var urlDetalle: String = ""
 
-
     constructor(){}
 
     constructor(calle: String, ciudad: String, m2: Int, precio: Double, moneda: String, contrato: TIPOS_CONTRATOS, numTelefono: String, urlDetalle: String) {

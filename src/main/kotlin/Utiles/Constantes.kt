@@ -1,6 +1,20 @@
 package Utiles
 
+import javax.rmi.CORBA.Util
+
 object Constantes {
+
+    enum class SO{
+        WINDOWS,
+        UBUNTU,
+        DESCONOCIDO
+    }
+
+    enum class EXTENSIONES_ARCHIVOS {
+        CSV
+    }
+
+    val DIRECTORIO_PERSONAL = System.getProperty("user.home")
 
     // -- DEBUG --
     enum class DEBUG(val value: Int) {
