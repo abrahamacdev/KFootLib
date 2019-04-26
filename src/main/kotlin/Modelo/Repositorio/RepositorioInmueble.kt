@@ -38,10 +38,16 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
          */
         inline fun <reified T: Inmueble> create(listaInmueble: List<T>? = null, propiedades: Propiedades = Propiedades()): RepositorioInmueble<T> =
             RepositorioInmueble<T>(T::class.java, listaInmueble, propiedades)
-
     }
 
-
+    /**
+     * {[guardadoAutomatico]} ->    Permite ejecutar un guardado periodicamente
+     * {[intervalos]} ->            Cada cuanto tiempo se ejecutará el guardado automático (se necesita activar "guardadoAutomatico"). Por defecto se guardará cada 30 segundos
+     * {[unidadTiempo]} ->          Unidad de tiempo a emplear para las emisiones periódicas (se necesita activar "guardadoAutomatico"). Por defecto se guardará cada 30 segundos
+     * {[rutaGuardadoArchivos]} ->  Ruta en la que se guardará los archivos. Por defecto se guardará en el directorio "Documentos"
+     * {[nombreArchivo]} ->         Nombre que tendra el archivo. Por defecto se le asignará uno si el valor de este es "null"
+     * {[extensionArchivo]} ->             Extensión que usará el archivo. Por defecto será "csv"
+     */
     class Propiedades(private var guardadoAutomatico: Boolean = false, private var intervalos: Long = 30,
                             private var unidadTiempo: TimeUnit = TimeUnit.SECONDS, private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
                             private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.CSV){
@@ -49,7 +55,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
         init {
 
             // Queremos guardado automático pero los intervalos pasados no son válidos
-            if (guardadoAutomatico == true && !intervalosGuardadoValidos(intervalos,unidadTiempo)){
+            if (guardadoAutomatico == true && !intervalosGuardadoAutValidos(intervalos,unidadTiempo)){
                 Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"No se ha establecido el guardado automático porque los intervalos son demasiado cortos.", Color.RED);
                 guardadoAutomatico = false
                 intervalos = 30
@@ -75,7 +81,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
         fun guardaCada(intervalos: Long = 30, unidadTiempo: TimeUnit = TimeUnit.SECONDS){
 
             // Evitamos los ticks de menos de 3 segundos
-            if (!intervalosGuardadoValidos(intervalos,unidadTiempo)){
+            if (!intervalosGuardadoAutValidos(intervalos,unidadTiempo)){
                 Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"No se ha establecido el guardado automático porque los intervalos son demasiado cortos.", Color.RED);
             }
 
@@ -92,7 +98,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
          *
          * @param ruta String: Ruta a utilizar para el guardado
          */
-        fun guardalosEn(ruta: String){
+        fun guardaLosDatosEn(ruta: String){
 
             // Comprobamos que la ruta sea válida
             if (rutaDeGuardadoValida(ruta)){
@@ -118,7 +124,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
          *
          * @param nombreArchivo: Nombre que se utilizará para nombrar al archivo
          */
-        fun conNombre(nombreArchivo: String){
+        fun archivoConNombre(nombreArchivo: String){
 
             // Comprobamos que el nombre del archivo sea válido
             if (nombreArchivoValido(nombreArchivo)){
@@ -136,7 +142,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
          *
          * @param extension: Extensión que tendrá el archivo
          */
-        fun conExtension(extension: Constantes.EXTENSIONES_ARCHIVOS){
+        fun archivoConExtension(extension: Constantes.EXTENSIONES_ARCHIVOS){
             this.extensionArchivo = extension
         }
 
@@ -149,7 +155,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
          *
          * @return Boolean: Si los intervalos a setear son válidos
          */
-        private fun intervalosGuardadoValidos(intervalos: Long, unidadTiempo: TimeUnit): Boolean{
+        private fun intervalosGuardadoAutValidos(intervalos: Long, unidadTiempo: TimeUnit): Boolean{
             if ((intervalos < 3000000000 && unidadTiempo == TimeUnit.NANOSECONDS) || (intervalos < 3000 && unidadTiempo == TimeUnit.MILLISECONDS) ){
                 return false
             }
@@ -225,6 +231,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
     }
 
 
+
     init {
 
         // Guardamos las propiedades que utilizaremos
@@ -274,12 +281,6 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
         // Establecemos los nombres de las columnas según los nombres de los atributos
         // del tipo actual
         setNomCols(inmueble.obtenerNombreAtributos())
-
-        // Añadimos los datos al dataframe
-        if (listaInmuebles != null) {
-            anadirListaInmuebles(listaInmuebles)
-        }
-
     }
 
     /**
@@ -316,23 +317,25 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
      *
      * @param inmuebles: Lista con los inmuebles
      */
-    fun anadirListaInmuebles(listaInmuebles: List<T>){
+    fun anadirListaInmuebles(listaInmuebles: List<T>?){
 
-        if (listaInmuebles.size > 0){
+        // Añadimos los datos al dataframe
+        if (listaInmuebles != null) {
+            if (listaInmuebles.size > 0){
 
-            // Recorremos cada uno de los inmuebles
-            listaInmuebles.forEach {inmueble ->
+                // Recorremos cada uno de los inmuebles
+                listaInmuebles.forEach {inmueble ->
 
-                // Recorremos cada atributo del inmueble
-                nomCols.forEach { atributo ->
+                    // Recorremos cada atributo del inmueble
+                    nomCols.forEach { atributo ->
 
-                    val valor = obtenerValorAtributo(atributo,inmueble)
-                    dataframe.column(atributo).appendCell(valor)
+                        val valor = obtenerValorAtributo(atributo,inmueble)
+                        dataframe.column(atributo).appendCell(valor)
 
+                    }
                 }
             }
         }
-
     }
 
     /**
@@ -408,7 +411,8 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
                 }
 
                 override fun onError(e: Throwable) {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+                    guardandoAutomaticamente = false            // Vamos a parar de guardar automáticamente
+                    e.printStackTrace()
                 }
 
             })

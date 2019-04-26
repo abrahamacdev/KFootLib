@@ -53,6 +53,7 @@ object Utils {
 
     /**
      * Creamos una columna a partir del {[nombreCol]} y del tipo de la {[clase]}
+     * Actualmente los tipos de objeto soportados son: String, int, float, double, boolean y long
      *
      * @param String nombreCol: Nombre de la columna a crear
      * @param Class<*> clase: Clase del tipo de columna a crear

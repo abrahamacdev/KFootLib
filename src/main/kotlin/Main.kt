@@ -1,12 +1,11 @@
 import Modelo.Repositorio.RepositorioInmueble
 import Modelo.Dominio.Inmueble
-import Modelo.Repositorio.PropiedadesRepositorioInmueble
 import Utiles.Constantes
 import Utiles.TIPOS_CONTRATOS
 
 fun main(args: Array<String>){
 
-    val inmueble = Inmueble(
+    /*val inmueble = Inmueble(
         "Calle Sol",
         "Chiclana",
         300,
@@ -27,14 +26,14 @@ fun main(args: Array<String>){
         "www.google.com"
     )
 
-    val propiedadesConjuntoInmueble= PropiedadesRepositorioInmueble()
-    with(propiedadesConjuntoInmueble){
-        guardalosEn("/home/admin/Documentos")
-        conNombre("Prueba")
-        conExtension(Constantes.EXTENSIONES_ARCHIVOS.CSV)
+    val propiedades = RepositorioInmueble.Propiedades()
+    with(propiedades){
+        guardaLosDatosEn("/home/admin/Documentos")
+        archivoConNombre("Prueba")
+        archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.CSV)
     }
 
-    val c = RepositorioInmueble.create<Inmueble>(listOf(inmueble,inmueble2), propiedadesConjuntoInmueble)
-    c.guardar()
+    val c = RepositorioInmueble.create<Inmueble>(propiedades =  propiedades)
+    c.guardar()*/
 
 }
