@@ -1,19 +1,25 @@
-package Modelo
+package Modelo.Dominio
 
 import Utiles.TIPOS_CONTRATOS
 
+/**
+ * Esta clase ofrece un modelo básico a seguir por los inmuebles
+ * más avanzados que se vayan a crear.
+ * * Es <b>obligatorio</b> que todos los inmuebles que hereden esta clase
+ * tengan un constructor vacío.
+ */
 open class Inmueble {
 
-    private var calle: String = ""
-    private var ciudad: String = ""
-    private var m2: Int = -1
-    private var precio: Double = -1.0
-    private var moneda: String = ""
-    private var contrato: String = TIPOS_CONTRATOS.TIPO_CONTRATO_DESCONOCIDO.value
-    private var numTelefono: String = ""
-    private var urlDetalle: String = ""
+    var calle: String = ""
+    var ciudad: String = ""
+    var m2: Int = -1
+    var precio: Double = -1.0
+    var moneda: String = ""
+    var contrato: String = TIPOS_CONTRATOS.TIPO_CONTRATO_DESCONOCIDO.value
+    var numTelefono: String = ""
+    var urlDetalle: String = ""
 
-    constructor(){}
+    constructor()
 
     constructor(calle: String, ciudad: String, m2: Int, precio: Double, moneda: String, contrato: TIPOS_CONTRATOS, numTelefono: String, urlDetalle: String) {
         this.calle = calle

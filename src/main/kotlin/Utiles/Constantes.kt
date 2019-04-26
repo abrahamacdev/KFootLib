@@ -1,7 +1,5 @@
 package Utiles
 
-import javax.rmi.CORBA.Util
-
 object Constantes {
 
     enum class SO{
