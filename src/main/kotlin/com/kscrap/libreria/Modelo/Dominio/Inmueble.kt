@@ -1,6 +1,6 @@
-package Modelo.Dominio
+package com.kscrap.libreria.Modelo.Dominio
 
-import Utiles.TIPOS_CONTRATOS
+import com.kscrap.libreria.Utiles.TIPOS_CONTRATOS
 
 /**
  * Esta clase ofrece un modelo básico a seguir por los inmuebles

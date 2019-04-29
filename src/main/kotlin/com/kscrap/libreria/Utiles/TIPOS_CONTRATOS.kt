@@ -1,4 +1,4 @@
-package Utiles
+package com.kscrap.libreria.Utiles
 
 enum class TIPOS_CONTRATOS(val value: String) {
 

@@ -1,8 +1,8 @@
-package Modelo.Repositorio
+package com.kscrap.libreria.Modelo.Repositorio
 
-import Modelo.Dominio.Inmueble
-import Utiles.Constantes
-import Utiles.Utils
+import com.kscrap.libreria.Modelo.Dominio.Inmueble
+import com.kscrap.libreria.Utiles.Constantes
+import com.kscrap.libreria.Utiles.Utils
 import com.andreapivetta.kolor.Color
 import io.reactivex.Observable
 import io.reactivex.Observer
@@ -37,7 +37,7 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
          * @return {[ConjuntoInmuebleFactory]}
          */
         inline fun <reified T: Inmueble> create(listaInmueble: List<T>? = null, propiedades: Propiedades = Propiedades()): RepositorioInmueble<T> =
-            RepositorioInmueble<T>(T::class.java, listaInmueble, propiedades)
+                RepositorioInmueble<T>(T::class.java, listaInmueble, propiedades)
     }
 
     /**
@@ -49,8 +49,8 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
      * {[extensionArchivo]} ->             Extensión que usará el archivo. Por defecto será "csv"
      */
     class Propiedades(private var guardadoAutomatico: Boolean = false, private var intervalos: Long = 30,
-                            private var unidadTiempo: TimeUnit = TimeUnit.SECONDS, private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
-                            private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.CSV){
+                      private var unidadTiempo: TimeUnit = TimeUnit.SECONDS, private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
+                      private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.CSV){
 
         init {
 

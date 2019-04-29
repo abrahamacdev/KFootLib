@@ -1,4 +1,4 @@
-package Utiles
+package com.kscrap.libreria.Utiles
 
 import com.andreapivetta.kolor.Color
 import com.andreapivetta.kolor.Kolor
@@ -13,7 +13,7 @@ object Utils {
      *
      * @return Constantes.SO: Sistema operativo del usuario
      */
-    fun determinarSistemaOperativo(): Constantes.SO{
+    fun determinarSistemaOperativo(): Constantes.SO {
         val os = System.getProperty("os.name").toLowerCase()
 
         when {
@@ -83,7 +83,7 @@ object Utils {
     fun obtenerDirDocumentos(): String?{
 
         val idioma = System.getProperty("user.language")
-        val so = Utils.determinarSistemaOperativo()
+        val so = determinarSistemaOperativo()
 
         var ruta: String? = null
 

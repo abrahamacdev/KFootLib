@@ -1,7 +1,4 @@
-import Modelo.Repositorio.RepositorioInmueble
-import Modelo.Dominio.Inmueble
-import Utiles.Constantes
-import Utiles.TIPOS_CONTRATOS
+package com.kscrap.libreria
 
 fun main(args: Array<String>){
 
