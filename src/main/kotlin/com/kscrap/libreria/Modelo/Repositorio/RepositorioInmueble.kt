@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 
 class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>? = null, propiedades: Propiedades = Propiedades()) {
 
-private lateinit var tipoActual: Class<T>                               // Tipo de dato que se almacena en el dataframe
+    private lateinit var tipoActual: Class<T>                           // Tipo de dato que se almacena en el dataframe
     private lateinit var nomCols: List<String>                          // Nombre de las columnas que almacena el dataframe
     private lateinit var dataframe: Table                               // Dataframe con los datos
     private var yaExisteArchivo: Boolean = false;                       // Comprobamos si el archivo ya ha sido creado
@@ -436,6 +436,58 @@ private lateinit var tipoActual: Class<T>                               // Tipo 
         return extension
     }
 
+    /**
+     * Covertimos los datos almacenados en el datafram en una lista
+     * de inmuebles
+     *
+     * @return ArrayList<T>: Lista con los inmuebles
+     */
+    fun obtenerInmueblesAlmacenados(): ArrayList<Inmueble> {
+
+        val numAtribs = tipoActual.newInstance().obtenerNombreAtributos().size
+
+        val listaInmuebles: ArrayList<Inmueble> = ArrayList()
+
+        // Recorremos cada tupla del dataframe
+        dataframe.forEach{fila ->
+
+            // Creamos una instancia del tipo de inmueble que se almacena en la tabla
+            val objInmueble = tipoActual.newInstance()
+
+            // Número de atirbutos que hemos establecido para el "objInmueble"
+            var numAtribsSeteados = 0
+
+            // Recorremos cada columna de la tupla actual
+            fila.columnNames().forEach {nombreCol ->
+
+                // Obtenemos el campo actual de la tupla que estemos recorriendo
+                var valorColumna = fila.getObject(nombreCol)
+
+                // Obtenemos el atributo de la clase para setearle su correspondiente valor
+                val atributo = objInmueble.javaClass.declaredFields.firstOrNull(){ variable ->
+                    variable.name.equals(nombreCol)
+                }
+
+                /*
+                    Si se encontró una variable que tiene el mismo nombre
+                    que la columna actual, se le seteará el valor de la
+                    celda actual
+                 */
+                if (atributo != null){
+                    atributo.isAccessible = true
+                    atributo.set(objInmueble,valorColumna)
+                    numAtribsSeteados++
+                }
+            }
+
+            if (numAtribs == numAtribsSeteados){
+                listaInmuebles.add(objInmueble)
+            }
+
+        }
+
+        return listaInmuebles
+    }
 
     private fun setNomCols(nomCols: List<String>){
         this.nomCols = nomCols

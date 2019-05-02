@@ -1,8 +1,13 @@
 package com.kscrap.libreria
 
+import com.kscrap.libreria.Modelo.Dominio.Inmueble
+import com.kscrap.libreria.Modelo.Repositorio.RepositorioInmueble
+import com.kscrap.libreria.Utiles.Constantes
+import com.kscrap.libreria.Utiles.TIPOS_CONTRATOS
+
 fun main(args: Array<String>){
 
-    /*val inmueble = Inmueble(
+    val inmueble = Inmueble(
         "Calle Sol",
         "Chiclana",
         300,
@@ -23,6 +28,8 @@ fun main(args: Array<String>){
         "www.google.com"
     )
 
+    val listaInmuebles = listOf<Inmueble>(inmueble,inmueble2)
+
     val propiedades = RepositorioInmueble.Propiedades()
     with(propiedades){
         guardaLosDatosEn("/home/admin/Documentos")
@@ -31,6 +38,11 @@ fun main(args: Array<String>){
     }
 
     val c = RepositorioInmueble.create<Inmueble>(propiedades =  propiedades)
-    c.guardar()*/
+    c.anadirListaInmuebles(listaInmuebles)
+
+    c.obtenerInmueblesAlmacenados().forEach {
+        println(it)
+    }
+
 
 }
