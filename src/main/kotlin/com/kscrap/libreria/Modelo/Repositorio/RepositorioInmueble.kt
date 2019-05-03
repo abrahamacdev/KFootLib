@@ -16,6 +16,7 @@ import java.io.FileWriter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import com.kscrap.libreria.Controlador.Transmisor
 
 class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>? = null, propiedades: Propiedades = Propiedades()) {
 
@@ -25,6 +26,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
     private var yaExisteArchivo: Boolean = false;                       // Comprobamos si el archivo ya ha sido creado
     private lateinit var propiedades: Propiedades;                      // Conjunto de propiedades que se usarán pòr defecto
     private lateinit var nombreArchivo: String;                         // Nombre con extensión del archivo donde se escribirán los datos
+    private var transmisor: Transmisor<T>? = null                       // Transmisor al que conectamos el el repositorio para el envío automático de los datos
 
     companion object {
 
@@ -50,7 +52,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      */
     class Propiedades(private var guardadoAutomatico: Boolean = false, private var intervalos: Long = 30,
                       private var unidadTiempo: TimeUnit = TimeUnit.SECONDS, private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
-                      private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.CSV){
+                      private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.CSV) {
 
         init {
 
@@ -213,32 +215,16 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
         fun getExtensionArchivo(): Constantes.EXTENSIONES_ARCHIVOS{
             return this.extensionArchivo
         }
-
-        /**
-         * Guardamos el nombre del archivo y la extensión
-         *
-         * @param nombreArchivo: Nombre que tendrá el archivo
-         * @param extension: Extensión con la que se guardará el archivo
-         */
-        /*fun conNombreYExtension(nombreArchivo: String, extension: Constantes.EXTENSIONES_ARCHIVOS){
-
-            if (nombreArchivo.matches(Regex("^\\w+(?:[-](?:\\w|[_])+)*\$"))){
-                this.nombreArchivo = nombreArchivo
-            }
-
-            this.extensionArchivo = extension
-        }*/
     }
-
 
 
     init {
 
         // Guardamos las propiedades que utilizaremos
-        setPropiedades(propiedades)
+        this.propiedades = propiedades
 
         // Guardamos la clase de objeto que se almacenará en el dataframe
-        setTipoActual(clazz)
+        this.tipoActual = clazz
 
         // Comprobamos que el archivo en el que se guardarán los datos exista
         val tempNombreArchivo = this.propiedades.getNombreArchivo() ?: obtenerNombreArchivoDefecto()
@@ -280,7 +266,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
 
         // Establecemos los nombres de las columnas según los nombres de los atributos
         // del tipo actual
-        setNomCols(inmueble.obtenerNombreAtributos())
+        this.nomCols = inmueble.obtenerNombreAtributos()
     }
 
     /**
@@ -332,6 +318,11 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
                         val valor = obtenerValorAtributo(atributo,inmueble)
                         dataframe.column(atributo).appendCell(valor)
 
+                    }
+
+                    // Si hay un transmisor le pasamos los inmuebles
+                    if (transmisor != null){
+                        transmisor!!.enviarInmueble(inmueble)
                     }
                 }
             }
@@ -444,8 +435,6 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      */
     fun obtenerInmueblesAlmacenados(): ArrayList<Inmueble> {
 
-        val numAtribs = tipoActual.newInstance().obtenerNombreAtributos().size
-
         val listaInmuebles: ArrayList<Inmueble> = ArrayList()
 
         // Recorremos cada tupla del dataframe
@@ -453,9 +442,6 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
 
             // Creamos una instancia del tipo de inmueble que se almacena en la tabla
             val objInmueble = tipoActual.newInstance()
-
-            // Número de atirbutos que hemos establecido para el "objInmueble"
-            var numAtribsSeteados = 0
 
             // Recorremos cada columna de la tupla actual
             fila.columnNames().forEach {nombreCol ->
@@ -476,28 +462,27 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
                 if (atributo != null){
                     atributo.isAccessible = true
                     atributo.set(objInmueble,valorColumna)
-                    numAtribsSeteados++
                 }
             }
 
-            if (numAtribs == numAtribsSeteados){
-                listaInmuebles.add(objInmueble)
-            }
+            // Añadimos el inmueble a la lista
+            listaInmuebles.add(objInmueble)
 
         }
 
         return listaInmuebles
     }
 
-    private fun setNomCols(nomCols: List<String>){
-        this.nomCols = nomCols
-    }
-
-    private fun setTipoActual(tipo: Class<T>){
-        this.tipoActual = tipo
-    }
-
-    private fun setPropiedades(propiedades: Propiedades){
-        this.propiedades = propiedades
+    /**
+     * Conectamos el {[RepositorioInmueble]} actual con un {[Transmisor]}
+     * para que cada vez que añadamos datos al dataframe se transmitan
+     * a través de este
+     *
+     * @param transmisor: Transmisor al que se conectará el repositorio
+     */
+    fun conectarConTransmisor(transmisor: Transmisor<T>){
+        if (!transmisor.transmisionTerminada()){
+            this.transmisor = transmisor
+        }
     }
 }

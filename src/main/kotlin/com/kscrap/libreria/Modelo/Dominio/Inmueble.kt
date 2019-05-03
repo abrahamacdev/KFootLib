@@ -7,6 +7,8 @@ import com.kscrap.libreria.Utiles.TIPOS_CONTRATOS
  * más avanzados que se vayan a crear.
  * * Es <b>obligatorio</b> que todos los inmuebles que hereden esta clase
  * tengan un constructor vacío.
+ * ** Es <b>obligatorio</b> que todos los inmuebles que hereden esta clase
+ * tengan variables que solo guarden datos referente al inmueble.
  */
 open class Inmueble {
 

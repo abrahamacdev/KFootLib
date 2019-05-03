@@ -36,7 +36,7 @@ fun main(args: Array<String>){
         archivoConNombre("Prueba")
         archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.CSV)
     }
-
+    
     val c = RepositorioInmueble.create<Inmueble>(propiedades =  propiedades)
     c.anadirListaInmuebles(listaInmuebles)
 
