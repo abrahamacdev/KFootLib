@@ -3,7 +3,9 @@ package com.kscrap.libreria.Controlador
 import com.kscrap.libreria.Modelo.Dominio.Inmueble
 import com.kscrap.libreria.Modelo.Repositorio.RepositorioInmueble
 import io.reactivex.processors.PublishProcessor
+import nonapi.io.github.classgraph.utils.ReflectionUtils
 import org.reactivestreams.Subscriber
+import java.lang.reflect.ParameterizedType
 
 /**
  * Un transmisor es la manera que tenemos de enviar la información a la
@@ -13,10 +15,11 @@ import org.reactivestreams.Subscriber
  */
 class Transmisor<T: Inmueble>{
 
-    private lateinit var processor: PublishProcessor<Inmueble>
+    private lateinit var processor: PublishProcessor<T>
     private var numSubscriptores: Int = 0
     private val maxNumSubscriptores: Int = 1
     private lateinit var clazz: Class<T>
+    private lateinit var tipo: T
 
     companion object {
 
@@ -28,6 +31,7 @@ class Transmisor<T: Inmueble>{
 
     constructor(clazz: Class<T>){
         this.clazz = clazz
+        processor = PublishProcessor.create()
     }
 
     /**
@@ -36,7 +40,7 @@ class Transmisor<T: Inmueble>{
      *
      * @param inmueble: Inmueble a enviar
      */
-    fun enviarInmueble(inmueble: Inmueble){
+    fun enviarInmueble(inmueble: T){
         processor.onNext(inmueble)
     }
 
@@ -44,9 +48,9 @@ class Transmisor<T: Inmueble>{
      * Enviamos el conjunto de inmuebles pasados por
      * parámetro a través del {[processor]}
      */
-    fun enviarRepositorioInmueble(repositorioInmueble: RepositorioInmueble<Inmueble>){
+    fun enviarRepositorioInmueble(repositorioInmueble: RepositorioInmueble<T>){
         repositorioInmueble.obtenerInmueblesAlmacenados().forEach {inmueble ->
-            enviarInmueble(inmueble)
+            enviarInmueble(inmueble as T)
         }
     }
 
@@ -73,7 +77,7 @@ class Transmisor<T: Inmueble>{
      *
      * @param subscriptor: Subscriptor a subscribir
      */
-    fun subscribirse(subscriptor: Subscriber<in Inmueble>){
+    fun subscribirse(subscriptor: Subscriber<in T>){
         if (numSubscriptores < maxNumSubscriptores){
             processor.subscribe(subscriptor)
             numSubscriptores++
@@ -88,5 +92,14 @@ class Transmisor<T: Inmueble>{
      */
     fun transmisionTerminada(): Boolean{
         return processor.hasComplete()
+    }
+
+    /**
+     * Retornamos el tipo del {[Transmisor]}
+     *
+     * @return Claas<T>: Inmueble almacenado en el transmisor
+     */
+    fun getTipoTransmisor(): Class<T>{
+        return clazz
     }
 }

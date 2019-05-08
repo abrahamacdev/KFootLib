@@ -3,6 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/KScrapLibreria.iml" filepath="$PROJECT_DIR$/.idea/KScrapLibreria.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/KScrapLibreria.main.iml" filepath="$PROJECT_DIR$/.idea/modules/KScrapLibreria.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/KScrapLibreria.test.iml" filepath="$PROJECT_DIR$/.idea/modules/KScrapLibreria.test.iml" />
     </modules>
   </component>
 </project>

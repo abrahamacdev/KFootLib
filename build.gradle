@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'org.jetbrains.kotlin.jvm' version '1.3.21'
+    id "com.github.johnrengelman.shadow" version "4.0.4"
 }
 
 apply plugin: 'kotlin'
@@ -49,9 +50,25 @@ sourceSets {
     test.java.srcDirs += 'src/test/kotlin/'
 }
 
+// Copy dependencies to 'lib' directory, as Netbeans usually did
+task copyToLib(type: Copy) {
+    from configurations.compile
+    from configurations.runtime
+
+    //into "$buildDir/libs/"          // Copia las dependencias directamente a 'libs', donde se produce el jar
+    into "$buildDir/output/KScrapLib"
+}
+
+//   Using dependency list to generate a manifest with appropriate classpath
 jar {
-    manifest {
-        //attributes 'Main-Class': 'com.Kscrap.KScrapLibreria.Main'
+    dependsOn copyToLib
+    /*manifest {
+        attributes 'Class-Path' : configurations.compile.collect { 'lib/' + it.getName() }.join(' ')
     }
+    from("$buildDir/libs/lib") {
+        into ("lib/")
+    }*/
+    //from configurations.compile.collect { fileTree(dir: "$buildDir/libs/lib") }
+    destinationDir = file("$buildDir/output/KScrapLib")
 }
 /* --------------------------- */

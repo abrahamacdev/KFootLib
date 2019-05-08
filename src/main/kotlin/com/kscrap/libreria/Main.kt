@@ -1,5 +1,6 @@
 package com.kscrap.libreria
 
+import com.kscrap.libreria.Controlador.Transmisor
 import com.kscrap.libreria.Modelo.Dominio.Inmueble
 import com.kscrap.libreria.Modelo.Repositorio.RepositorioInmueble
 import com.kscrap.libreria.Utiles.Constantes
@@ -44,5 +45,6 @@ fun main(args: Array<String>){
         println(it)
     }
 
+    Transmisor.crear<Inmueble>().getTipoTransmisor()
 
 }
