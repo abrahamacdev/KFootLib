@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 
 fun main(args: Array<String>){
 
-    /*val inmueble = Inmueble(
+    val inmueble = Inmueble(
         "Calle Sol",
         "Chiclana",
         300,
@@ -21,7 +21,7 @@ fun main(args: Array<String>){
         TIPOS_CONTRATOS.TIPO_CONTRATO_ALQUILER,
         "",
         "www.google.com"
-    )*/
+    )
     val inmueble2 = Vivienda(
         "Calle Luna",
         "San Fernando",
@@ -34,7 +34,7 @@ fun main(args: Array<String>){
             2
     )
 
-    val listaInmuebles = listOf<Vivienda>(inmueble2)
+    val listaInmuebles = listOf<Inmueble>(inmueble,inmueble2)
 
     val propiedades = ConfiguracionRepositorioInmueble()
     with(propiedades){
@@ -44,7 +44,7 @@ fun main(args: Array<String>){
         archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.CSV)
     }
 
-    val c = RepositorioInmueble.create<Vivienda>(propiedades =  propiedades)
+    val c = RepositorioInmueble.create<Inmueble>(propiedades =  propiedades)
     c.anadirListaInmuebles(listaInmuebles)
 
     // Transmisor.crear<Inmueble>().getTipoTransmisor()

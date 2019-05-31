@@ -26,6 +26,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
     private lateinit var configuracion: ConfiguracionRepositorioInmueble; // Conjunto de configuracion que se usarán pòr defecto
     private lateinit var nombreArchivo: String;                         // Nombre con extensión del archivo donde se escribirán los datos
     private var transmisor: Transmisor<T>? = null                       // Transmisor al que conectamos el el repositorio para el envío automático de los datos
+    private var seHaCambiadoTipo = false                                // No servirá para modificar las columnas del dataframe
 
     companion object {
 
@@ -74,7 +75,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      *
      * @param listaInmuebles: Lista de inmuebles que añadiremos al dataframe
      */
-    private fun crearDataFrame(listaInmuebles: List<T>?){
+    private fun crearDataFrame(listaInmuebles: List<T>? = null){
 
 
         dataframe = Table.create()
@@ -94,6 +95,8 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
         // del tipo actual
         this.nomCols = inmueble.obtenerNombreAtributos()
 
+        // Añadimos la lista de inmueble al dataframe
+        anadirListaInmuebles(listaInmuebles)
     }
 
     /**
@@ -137,6 +140,11 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      * @param inmueble: Inmueble a añadir al dataframe
      */
     fun anadirInmueble(inmueble: T){
+
+        // El inmueble recibido es un hijo de la clase "Inmueble" por lo que cambiaremos los datos de los inmuebles que se almacenan
+        if (!inmueble.javaClass.canonicalName.equals(tipoActual.javaClass.canonicalName) && !seHaCambiadoTipo && inmueble.javaClass.superclass.canonicalName.equals(this.inmueble.javaClass.canonicalName)){
+            cambiarDataframe(inmueble)
+        }
 
         // Recorremos cada atributo del inmueble
         nomCols.forEach { atributo ->
@@ -261,6 +269,61 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
         }
 
         return extension
+    }
+
+    /**
+     * Cambiamos los campos que se almacenarán en el dataframe para
+     * satisfacer la necesidad de guardar los datos del nuevo tipo
+     * de inmueble
+     *
+     * @param inmueble: Nuevo tipo de inmueble
+     */
+    private fun cambiarDataframe(inmueble: Inmueble){
+
+        var tmpDataframe = Table.create()
+        val listaAtributos = inmueble.obtenerNombreTipoAtributos()
+
+        with(tmpDataframe){
+
+            addColumns(
+                    //Hacemos uso del operador "spread" (*), que nos permite pasar un Array a un vararg
+                    *listaAtributos.map {
+                        Utils.castearAColumna(it.first,it.second)!!
+                    }.toTypedArray()
+            )
+        }
+
+        // Nueva lista de columnas
+        this.nomCols = inmueble.obtenerNombreAtributos()
+
+        // Hacemos una copia de los antiguos datos a la nueva tabla
+        tmpDataframe = copiarDatosDataframe(tmpDataframe,dataframe)
+
+        // Ya no podremos cambiar más el tipo de dato de este dataframe
+        //seHaCambiadoTipo = false
+
+    }
+
+    /**
+     * Copiamos los datos almacenados del antiguo dataframe al
+     * nuevo
+     */
+    private fun copiarDatosDataframe(dfNuevo: Table, dfViejo: Table): Table{
+
+        val inmuebles = ArrayList<Inmueble>()
+
+        dfViejo.forEach {fila ->
+
+            var inmueble = inmueble.javaClass.newInstance()
+
+            fila.columnNames().forEach {nomCol ->
+                inmueble.establecerValor(nomCol, fila.getObject(nomCol), inmueble)
+            }
+        }
+
+        System.exit(1)
+
+        return dfViejo
     }
 
     /**

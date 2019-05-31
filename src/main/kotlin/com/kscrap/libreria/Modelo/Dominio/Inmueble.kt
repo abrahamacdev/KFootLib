@@ -23,6 +23,8 @@ open class Inmueble {
     var contrato: String = TIPOS_CONTRATOS.TIPO_CONTRATO_DESCONOCIDO.value
     var numTelefono: String = ""
     var urlDetalle: String = ""
+    private var todosCampos = ArrayList<Field>()
+
 
     constructor()
 
@@ -125,6 +127,11 @@ open class Inmueble {
      */
     final fun obtenerTodosCampos(): ArrayList<Field>{
 
+        // Cacheamos los campos del inmueble actual
+        if (todosCampos.size > 0){
+            return todosCampos
+        }
+
         val campos = ArrayList<Field>()
 
         var superr: Class<*>? = this.javaClass
@@ -136,7 +143,9 @@ open class Inmueble {
             superr = superr.superclass
         }
 
-        return campos
+        todosCampos = campos
+
+        return todosCampos
     }
 
     /**
