@@ -4,6 +4,8 @@ import com.andreapivetta.kolor.Color
 import com.kscrap.libreria.Utiles.Constantes
 import com.kscrap.libreria.Utiles.Utils
 import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 /**
@@ -14,19 +16,10 @@ import java.util.concurrent.TimeUnit
  * {[nombreArchivo]} ->         Nombre que tendra el archivo. Por defecto se le asignará uno si el valor de este es "null"
  * {[extensionArchivo]} ->             Extensión que usará el archivo. Por defecto será "csv"
  */
-class ConfiguracionRepositorioInmueble(private var guardadoAutomatico: Boolean = false, private var intervalos: Long = 30,
-                  private var unidadTiempo: TimeUnit = TimeUnit.SECONDS, private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
-                  private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.CSV) {
+class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
+                  private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.csv) {
 
     init {
-
-        // Queremos guardado automático pero los intervalos pasados no son válidos
-        if (guardadoAutomatico == true && !intervalosGuardadoAutValidos(intervalos,unidadTiempo)){
-            Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"No se ha establecido el guardado automático porque los intervalos son demasiado cortos.", Color.RED);
-            guardadoAutomatico = false
-            intervalos = 30
-            unidadTiempo = TimeUnit.SECONDS
-        }
 
         // Comprobamos que la ruta de guardado de los archivos sea válida
         if (rutaGuardadoArchivos != null){
@@ -35,29 +28,13 @@ class ConfiguracionRepositorioInmueble(private var guardadoAutomatico: Boolean =
                         "Se usará $rutaGuardadoArchivos", Color.RED)
             }
         }
-    }
 
-    /**
-     * Activamos la opción de guardar de forma automática
-     * la información del dataframe cada {[intervalos]}
-     *
-     * @param intervalos: Cada cuanto tiempo se guardará la información
-     * @param timeUnit; Unidad de tiempo que se utilizara entre ticks
-     */
-    fun guardaCada(intervalos: Long = 30, unidadTiempo: TimeUnit = TimeUnit.SECONDS){
-
-        // Evitamos los ticks de menos de 3 segundos
-        if (!intervalosGuardadoAutValidos(intervalos,unidadTiempo)){
-            Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"No se ha establecido el guardado automático porque los intervalos son demasiado cortos.", Color.RED);
+        // Obtenemos un nombre por defecto para el archivo si no se ha especificado uno
+        if (nombreArchivo == null){
+            nombreArchivo = obtenerNombreArchivoDefecto()
         }
 
-        else {
-            this.guardadoAutomatico = true
-            this.intervalos = intervalos
-            this.unidadTiempo = unidadTiempo
-        }
     }
-
     /**
      * Establecemos la ruta en la que se guardará
      * el {[RepositorioInmueble]}
@@ -155,17 +132,16 @@ class ConfiguracionRepositorioInmueble(private var guardadoAutomatico: Boolean =
         return nombreArchivo.matches(patron)
     }
 
-
-    fun getGuardadoAutomatico(): Boolean {
-        return this.guardadoAutomatico
-    }
-
-    fun getIntervalos(): Long {
-        return this.intervalos
-    }
-
-    fun getUnidadTiempo(): TimeUnit {
-        return this.unidadTiempo
+    /**
+     * Obtenemos un nombre por defecto para el archivo en caso de que no
+     * se proporcione uno al crear el objeto
+     *
+     * @return String: Nombre del archivo por defecto
+     */
+    private fun obtenerNombreArchivoDefecto(): String{
+        val dtf: DateTimeFormatter = DateTimeFormatter.ofPattern("dd_MM_HH_mm")
+        val ahora: LocalDateTime = LocalDateTime.now()
+        return "KScrap_${dtf.format(ahora)}"
     }
 
     fun getRutaGuardadoArchivos(): String?{

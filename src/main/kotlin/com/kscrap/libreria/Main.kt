@@ -1,19 +1,19 @@
 package com.kscrap.libreria
 
-import com.kscrap.libreria.Controlador.Transmisor
 import com.kscrap.libreria.Modelo.Dominio.Inmueble
 import com.kscrap.libreria.Modelo.Repositorio.ConfiguracionRepositorioInmueble
 import com.kscrap.libreria.Modelo.Repositorio.RepositorioInmueble
 import com.kscrap.libreria.Utiles.Constantes
 import com.kscrap.libreria.Utiles.TIPOS_CONTRATOS
+import io.reactivex.subjects.PublishSubject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 
-fun main(args: Array<String>){
+fun main(args: Array<String>) = runBlocking<Unit> {
 
     val inmueble = Inmueble(
-        "Calle Sol",
+        "Calle Solsticio",
         "Chiclana",
         300,
         300000.0,
@@ -22,37 +22,35 @@ fun main(args: Array<String>){
         "",
         "www.google.com"
     )
-    val inmueble2 = Vivienda(
-        "Calle Luna",
-        "San Fernando",
-        450,
-        450000.0,
-        "€",
-        TIPOS_CONTRATOS.TIPO_CONTRATO_ALQUILER,
-        "",
-        "www.google.com",
+
+    val vivienda2 = Vivienda(
+            "Calle Jupiter",
+            "Sanlucar",
+            450,
+            450000.0,
+            "€",
+            TIPOS_CONTRATOS.TIPO_CONTRATO_ALQUILER,
+            "",
+            "www.google.com",
             2
     )
 
-    val listaInmuebles = listOf<Inmueble>(inmueble,inmueble2)
+    val listaInmuebles = listOf<Inmueble>(inmueble, vivienda2)
 
     val propiedades = ConfiguracionRepositorioInmueble()
     with(propiedades){
-        guardaCada(3, TimeUnit.SECONDS)
-        guardaLosDatosEn("/home/admin/Documentos")
+        guardaLosDatosEn("/home/abraham/Documentos")
         archivoConNombre("Prueba")
-        archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.CSV)
+        archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.csv)
     }
 
     val c = RepositorioInmueble.create<Inmueble>(propiedades =  propiedades)
     c.anadirListaInmuebles(listaInmuebles)
 
-    // Transmisor.crear<Inmueble>().getTipoTransmisor()
+    val sujeto: PublishSubject<Nothing> = PublishSubject.create()
+    sujeto.subscribe({},{},{
+        println("Guardado realizado")
+    })
 
-    while (!c.todoGuardado()){
-
-        runBlocking {
-            delay(500)
-        }
-    }
+    c.guardar(sujeto)
 }

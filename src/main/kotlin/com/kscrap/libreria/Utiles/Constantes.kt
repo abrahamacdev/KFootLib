@@ -9,7 +9,7 @@ object Constantes {
     }
 
     enum class EXTENSIONES_ARCHIVOS {
-        CSV
+        csv
     }
 
     val DIRECTORIO_PERSONAL = System.getProperty("user.home")

@@ -1,37 +1,42 @@
 package com.kscrap.libreria.Modelo.Repositorio
 
+import com.andreapivetta.kolor.Color
 import com.kscrap.libreria.Modelo.Dominio.Inmueble
 import com.kscrap.libreria.Utiles.Constantes
 import com.kscrap.libreria.Utiles.Utils
-import io.reactivex.Observable
-import io.reactivex.Observer
-import io.reactivex.disposables.Disposable
 import kotlinx.coroutines.*
 import tech.tablesaw.api.Table
 import tech.tablesaw.io.csv.CsvWriteOptions
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import com.kscrap.libreria.Controlador.Transmisor
+import io.reactivex.subjects.PublishSubject
+import tech.tablesaw.api.Row
+import kotlin.coroutines.CoroutineContext
 
-class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>? = null, configuracion: ConfiguracionRepositorioInmueble = ConfiguracionRepositorioInmueble()) {
+class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>? = null, configuracion: ConfiguracionRepositorioInmueble = ConfiguracionRepositorioInmueble()): CoroutineScope {
 
-    private lateinit var inmueble: Inmueble                             // Nos servirá más adelante para obtener la información de los inmuebles que se creen
-    private lateinit var tipoActual: Class<T>                           // Tipo de dato que almacena el repositorio
+    private lateinit var instanciaTipoActual: Inmueble                  // Nos servirá más adelante para obtener la información de los inmuebles que se creen
+    private lateinit var tipoActual: Class<*>                           // Tipo de dato que almacena el repositorio
+
     private lateinit var nomCols: List<String>                          // Nombre de las columnas que almacena el dataframe
     private lateinit var dataframe: Table                               // Dataframe con los datos
+
+    private lateinit var configuracion: ConfiguracionRepositorioInmueble; // Configuracion que se usara para el repositorio
+    private var transmisor: Transmisor<Inmueble>? = null                // Transmisor al que conectamos el el repositorio para el envío automático de los datos
+
+    private var guardadoRealizado = false                               // Primer guardado que realicemos para el repositorio actual
+    private var permitirGuardado = true                                 // Permitira guardar los datos o por el contrario denegara la accion
+    private var seHaCambiadoTipo = false                                // Permitira la modificacion de las columnas del dataframe en su estado inicial
     private var yaExisteArchivo: Boolean = false;                       // Comprobamos si el archivo ya ha sido creado
-    private lateinit var configuracion: ConfiguracionRepositorioInmueble; // Conjunto de configuracion que se usarán pòr defecto
     private lateinit var nombreArchivo: String;                         // Nombre con extensión del archivo donde se escribirán los datos
-    private var transmisor: Transmisor<T>? = null                       // Transmisor al que conectamos el el repositorio para el envío automático de los datos
-    private var seHaCambiadoTipo = false                                // No servirá para modificar las columnas del dataframe
+
+    val job = Job()                                                     // Tarea asociada a la coroutina
+    override val coroutineContext: CoroutineContext                     // Contexto de la coroutina
+        get() = Dispatchers.IO + job
 
     companion object {
-
-        private var guardandoAutomaticamente = false                    // Nos ayuda a saber si actualmente estamos guardando de forma automática los datos
-
 
         /**
          * Creamos un {[ConjuntoInmuebleFactory]} del tipo necesitado
@@ -42,32 +47,44 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
                 RepositorioInmueble<T>(T::class.java, listaInmueble, propiedades)
     }
 
-
     init {
 
-        // Guardamos las configuracion que utilizaremos
+        // Establecemos la configuraciona utilizar
         this.configuracion = configuracion
 
-        // Guardamos una instancia del objeto que se almacenará
-        this.inmueble = clazz.newInstance()
-
-        // Tipo de dato que se está almacenando en el repositorio
+        // Guardamos el tipo de dato que se utilizara
+        this.instanciaTipoActual = clazz.newInstance()
         this.tipoActual = clazz
-
-        // Comprobamos que el archivo en el que se guardarán los datos exista
-        val tempNombreArchivo = this.configuracion.getNombreArchivo() ?: obtenerNombreArchivoDefecto()
-        val archivoCompleto = tempNombreArchivo + determinarExtension()
-        nombreArchivo = archivoCompleto
-        val archivo = File(configuracion.getRutaGuardadoArchivos() + "/$archivoCompleto")
-        if (archivo.exists() && archivo.isFile) {
-            yaExisteArchivo = true
-        }
-
-        // Comenzamos a emitir ticks para el guardado de los datos
-        establecerGuardadoAutomatico()
 
         // Creamos el dataframe y añadimos los inmuebles
         crearDataFrame(listaInmuebles)
+
+        // Comprobamos si el archivo existe
+        if (comprobarExistenciaArchivo()){
+
+            // El archivo existe
+            yaExisteArchivo = true
+
+            // Comprobamos si las columnas del archivo coinciden con las del dataframe actual
+            if(colsArchivoCoincidenConActuales()){
+
+
+
+            }
+        }
+
+
+        /*// Comprobamos si el tipo de inmueble que se almacena en el archivo
+        // es diferente al actual
+        if (!archivoAlmacenaInmuebleActual()){
+
+            // No coinciden los tipos, denegaremos el guardado
+            permitirGuardado = false
+        }*/
+
+
+        // Comenzamos a emitir ticks para el guardado de los datos
+        //establecerGuardadoAutomatico()
     }
 
     /**
@@ -77,38 +94,102 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      */
     private fun crearDataFrame(listaInmuebles: List<T>? = null){
 
-
+        // Creamos el dataframe
         dataframe = Table.create()
-        val listaAtributos = inmueble.obtenerNombreTipoAtributos() // Nombre de los atributos y su tipo
 
-        with(dataframe){
-
-            addColumns(
-                //Hacemos uso del operador "spread" (*), que nos permite pasar un Array a un vararg
-                 *listaAtributos.map {
-                    Utils.castearAColumna(it.first,it.second)!!
-                }.toTypedArray()
-            )
-        }
+        // Añadimos las columnas al dataframe
+        anadirColsDataframe(dataframe, instanciaTipoActual)
 
         // Establecemos los nombres de las columnas según los nombres de los atributos
         // del tipo actual
-        this.nomCols = inmueble.obtenerNombreAtributos()
+        this.nomCols = instanciaTipoActual.obtenerNombreAtributos()
 
         // Añadimos la lista de inmueble al dataframe
         anadirListaInmuebles(listaInmuebles)
     }
 
     /**
-     * Obtenemos un nombre por defecto para el archivo en caso de que no
-     * se proporcione uno al crear el objeto
+     * Añadimos al dataframe las columnas y sus respectivos tipos
+     * a partir de los atributos del tipo de dato que se almacena
      *
-     * @return String: Nombre del archivo por defecto
+     * @param df: Tabla a la que se le asignaran las columnas
+     * @param inmueble: Inmueble del que estraeremos las columnas a establecer en [df]
      */
-    private fun obtenerNombreArchivoDefecto(): String{
-        val dtf: DateTimeFormatter = DateTimeFormatter.ofPattern("dd_MM_HH_mm")
-        val ahora: LocalDateTime = LocalDateTime.now()
-        return "KScrap_${dtf.format(ahora)}"
+    fun anadirColsDataframe(df: Table, inmueble: Inmueble){
+
+        val listaAtributos = inmueble.obtenerNombreTipoAtributos()
+
+        with(df){
+            addColumns(
+                //Hacemos uso del operador "spread" (*), que nos permite pasar un Array a un vararg
+                *listaAtributos.map {
+                    Utils.castearAColumna(it.first,it.second)!!
+                }.toTypedArray()
+            )
+        }
+    }
+
+    /**
+     * Comprobamos si existe el archivo en el que
+     * se guardaran los datos del dataframe
+     *
+     * @return Boolean: Si existe el archivo o no
+     */
+    fun comprobarExistenciaArchivo(): Boolean {
+
+        // Nombre completo del archivo
+        nombreArchivo = this.configuracion.getNombreArchivo() + "." + configuracion.getExtensionArchivo().name
+
+        // Comprobamos la existencia del archivo
+        val archivo = File(configuracion.getRutaGuardadoArchivos() + "/$nombreArchivo")
+        if (archivo.exists() && archivo.isFile){
+            return true
+        }
+        return false
+    }
+
+
+
+    /**
+     * Añadimos el inmueble pasado por parámetro
+     * a nuestro dataframe
+     *
+     * @param inmueble: Inmueble a añadir al dataframe
+     */
+    fun anadirInmueble(inmueble: T){
+
+        // Comprobamos que el inmueble recibido por parametro sea diferente al ya establecido
+        if (!inmueble.javaClass.canonicalName.equals(tipoActual.canonicalName)){
+
+            // Comprobamos si ya hemos cambiado el tipo de dato del inmueble
+            if (!seHaCambiadoTipo){
+
+                cambiarTipoDataFrame(inmueble)
+            }
+
+            // El inmueble recibido es diferente al actual y ya hemos modificado el tipo de dato almacenado
+            else {
+                Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE, "El tipo de inmueble almacenado en el repositorio ya ha sido modificado. El inmueble no se guardara.", Color.RED)
+                return
+            }
+        }
+
+        // Recorremos cada atributo del inmueble
+        nomCols.forEach { atributo ->
+
+            val valor = inmueble.obtenerValorDe(atributo,inmueble)
+
+            // Evitamos setear valores extraños al dataframe
+            if (valor != null){
+                dataframe.column(atributo).appendCell(valor)
+            }
+        }
+
+        // Si hay un transmisor le pasamos los inmuebles
+        if (transmisor != null){
+            transmisor!!.enviarInmueble(inmueble)
+        }
+
     }
 
     /**
@@ -133,47 +214,25 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
         }
     }
 
-    /**
-     * Añadimos el inmueble pasado por parámetro
-     * a nuestro dataframe
-     *
-     * @param inmueble: Inmueble a añadir al dataframe
-     */
-    fun anadirInmueble(inmueble: T){
 
-        // El inmueble recibido es un hijo de la clase "Inmueble" por lo que cambiaremos los datos de los inmuebles que se almacenan
-        if (!inmueble.javaClass.canonicalName.equals(tipoActual.javaClass.canonicalName) && !seHaCambiadoTipo && inmueble.javaClass.superclass.canonicalName.equals(this.inmueble.javaClass.canonicalName)){
-            cambiarDataframe(inmueble)
-        }
-
-        // Recorremos cada atributo del inmueble
-        nomCols.forEach { atributo ->
-
-            val valor = inmueble.obtenerValorDe(atributo,inmueble)
-            dataframe.column(atributo).appendCell(valor)
-
-        }
-
-        // Si hay un transmisor le pasamos los inmuebles
-        if (transmisor != null){
-            transmisor!!.enviarInmueble(inmueble)
-        }
-    }
 
     /**
      * Ejecutamos un volcado de datos en el archivo
      * y directorio deseados. Se creará un nuevo hilo que será el encargado de
      * guardar los datos bloqueando el archivo.
+     *
+     *  @return Sujeto que nos permitira saber cuando se ha completado el guardado
      */
-    fun guardar(){
+    suspend fun guardar(avisoGuardado: PublishSubject<Nothing>? = null) {
 
-        // Comprobamos que la tabla tenga datos para guardar
-        if (dataframe.rowCount() > 0){
+        // Comprobamos que el guardado este permitido
+        if (permitirGuardado){
 
-            runBlocking {
+            // Comprobamos que la tabla tenga datos para guardar
+            if (dataframe.rowCount() > 0){
 
                 // Ejecutamos el proceso de escritura en una corutina dedicada
-                async(Dispatchers.IO){
+                launch (coroutineContext){
 
                     // Añadimos los datos al archivo
                     val bufferedWriter = BufferedWriter(FileWriter(File(configuracion.getRutaGuardadoArchivos() + "/$nombreArchivo"),true))
@@ -198,9 +257,23 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
                         bufferedWriter.close()                  // Cerramos el búffer
 
                         dataframe = dataframe.emptyCopy()       // Eliminamos los datos del dataframe
-                        yaExisteArchivo = true                  // Si el archivo no existía ha sido creado
+
+                        // Si el archivo no existía ha sido creado
+                        if (!yaExisteArchivo){
+                            yaExisteArchivo = true
+                        }
+
+                        // COmprobamos si es el primer guardado que realizamos
+                        if (!guardadoRealizado){
+                            guardadoRealizado = true
+                        }
+
+                        // Avisaremos del guardado por el sujeto pasado como parametro
+                        if (avisoGuardado != null){
+                            avisoGuardado.onComplete()
+                        }
                     }
-                }
+                }.join()
             }
         }
     }
@@ -215,116 +288,204 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
         return dataframe.count() == 0
     }
 
-    /**
-     * Activamos el guardado automático y comenzamos a emitir ticks para el guardado
-     * de los datos
-     */
-    private fun establecerGuardadoAutomatico(){
 
-        // Comprobamos que el guardado automático esté establecido
-        if (this.configuracion.getGuardadoAutomatico()){
-
-            Observable.interval(this.configuracion.getIntervalos(), this.configuracion.getUnidadTiempo()).subscribe(object :
-                Observer<Any> {
-                override fun onComplete() {
-                    guardandoAutomaticamente = false            // Vamos a parar de guardar automáticamente
-                }
-
-                override fun onSubscribe(d: Disposable) {
-                    guardandoAutomaticamente = true             // Hemos comenzado a recibir los ticks
-                }
-
-                override fun onNext(t: Any) {
-
-                    if (guardandoAutomaticamente == false){
-                        onComplete()
-                    }
-
-                    else {
-                        guardar()                               // Guardamos los datos que halla hasta el momento
-                    }
-                }
-
-                override fun onError(e: Throwable) {
-                    guardandoAutomaticamente = false            // Vamos a parar de guardar automáticamente
-                    e.printStackTrace()
-                }
-
-            })
-        }
-    }
 
     /**
-     * Convertimos {[Constantes.EXTENSIONES_ARCHIVOS]} a una extensión válida
-     * para nuestro archivo
-     *
-     * @return String: Extensíon a usar en el archivo
+     * Comprobamos si las columnas del archivo coinciden con
+     * con las columnas del dataframe actual
      */
-    private fun determinarExtension(): String{
+    private fun colsArchivoCoincidenConActuales(): Boolean{
 
-        var extension: String = "";
+        // Lista con las cabeceras del archivo
+        val cabecerasArchivo = cargarNomColsArchivo()
 
-        when{
-            configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.CSV -> { extension = ".csv" }
-        }
+        // Comprobamos que halla cols en la lista
+        if (cabecerasArchivo != null){
 
-        return extension
-    }
+            // Comprobamos que las cabeceras de ambas lista coincidan
+            if (colsDataframesCoinciden(nomCols,cabecerasArchivo)){
 
-    /**
-     * Cambiamos los campos que se almacenarán en el dataframe para
-     * satisfacer la necesidad de guardar los datos del nuevo tipo
-     * de inmueble
-     *
-     * @param inmueble: Nuevo tipo de inmueble
-     */
-    private fun cambiarDataframe(inmueble: Inmueble){
-
-        var tmpDataframe = Table.create()
-        val listaAtributos = inmueble.obtenerNombreTipoAtributos()
-
-        with(tmpDataframe){
-
-            addColumns(
-                    //Hacemos uso del operador "spread" (*), que nos permite pasar un Array a un vararg
-                    *listaAtributos.map {
-                        Utils.castearAColumna(it.first,it.second)!!
-                    }.toTypedArray()
-            )
-        }
-
-        // Nueva lista de columnas
-        this.nomCols = inmueble.obtenerNombreAtributos()
-
-        // Hacemos una copia de los antiguos datos a la nueva tabla
-        tmpDataframe = copiarDatosDataframe(tmpDataframe,dataframe)
-
-        // Ya no podremos cambiar más el tipo de dato de este dataframe
-        //seHaCambiadoTipo = false
-
-    }
-
-    /**
-     * Copiamos los datos almacenados del antiguo dataframe al
-     * nuevo
-     */
-    private fun copiarDatosDataframe(dfNuevo: Table, dfViejo: Table): Table{
-
-        val inmuebles = ArrayList<Inmueble>()
-
-        dfViejo.forEach {fila ->
-
-            var inmueble = inmueble.javaClass.newInstance()
-
-            fila.columnNames().forEach {nomCol ->
-                inmueble.establecerValor(nomCol, fila.getObject(nomCol), inmueble)
+                return true
             }
         }
 
-        System.exit(1)
-
-        return dfViejo
+        return false
     }
+
+    /**
+     * Comprobamos que las columnas de los dataframes pasados por parametro
+     * coincidan
+     * *Solo comprueba que los nombres de las columnas coincidan
+     *
+     * @param nuevoDataframe: Nuevo dataframe
+     * @param viejoDataframe: VIejo dataframe
+     */
+    private fun colsDataframesCoinciden(nuevoDataframe: Table, viejoDataframe: Table): Boolean{
+
+        println(nuevoDataframe)
+        println(nuevoDataframe.columnCount())
+        println(nomCols.size)
+
+        // Comprobamos primero que la cuenta de columnas coincidan
+        if (nuevoDataframe.columnCount() == nomCols.size){
+
+            // Array con los nombres de las columnas del nuuevo dataframe
+            val cabecerasNuevoDataframe = nuevoDataframe.columnArray()
+
+            // Array con los nombres de las columnas del viejo dataframe
+            val cabecerasViejoDataframe = viejoDataframe.columnArray()
+
+            // Comprobamos si todas las cols del archivo tienen los mismos
+            // nombres que las cols del dataframe actual
+            val noCoincide = cabecerasNuevoDataframe.firstOrNull {
+                !cabecerasViejoDataframe.contains(it)
+            }
+
+            // Estan todas las cols
+            if (noCoincide == null){
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Comprobamos que las columnas de los dataframes pasados por parametro
+     * coincidan
+     * *Solo comprueba que los nombres de las columnas coincidan
+     *
+     * @param nuevasCabeceras: Nuevas cabeceras
+     * @param viejasCabeceras: VIejos cabeceras
+     */
+    private fun colsDataframesCoinciden(nuevasCabeceras: List<String>, viejasCabeceras: List<String>): Boolean{
+
+        // Comprobamos primero que la cuenta de columnas coincidan
+        if (nuevasCabeceras.size == viejasCabeceras.size){
+
+            // Comprobamos si todas las cols del archivo tienen los mismos
+            // nombres que las cols del dataframe actual
+            val noCoincide = nuevasCabeceras.firstOrNull {
+                !viejasCabeceras.contains(it)
+            }
+
+            // Estan todas las cols
+            if (noCoincide == null){
+                return true
+            }
+        }
+        return false
+    }
+
+
+
+    /**
+     * Obtenemos los datos del archivo pasado por parametros
+     *
+     * @return ArrayList<String>?: Lista con los nombres de la cabecera
+     */
+    fun cargarNomColsArchivo(): List<String>?{
+
+        // Lista con los nombres de la cabecera del archivo
+        var cabeceras: ArrayList<String>? = null
+
+        // Comprobamos que primero exista el archivo
+        if (yaExisteArchivo){
+
+            // Inicializamos la lista
+            cabeceras = ArrayList()
+
+            // Leemos los datos del archivo
+            val tabla = Table.read().csv(configuracion.getRutaGuardadoArchivos() + "/" + nombreArchivo)
+
+            // Añadimos a la lista los nombres de las columnas
+            tabla.columnArray().forEach { cabeceras.add(it.name()) }
+        }
+
+        return cabeceras
+    }
+
+    /**
+     * Cambiamos el tipo de dato que se almacena en el dataframe
+     * por el tipo de inmueble pasado como parametro
+     *
+     * @param nuevoInmueble: Nuevo inmueble que se va a almacenar en el dataframe
+     */
+    private fun cambiarTipoDataFrame(nuevoInmueble: Inmueble){
+
+        // Dataframe con las columnas del nuevo tipo
+        var tmpDataFrame = Table.create()
+
+        // Añadimos al dataframe temporal las columnas del nuevo inmueble
+        anadirColsDataframe(tmpDataFrame, nuevoInmueble)
+
+        // Clonamos los datos del dataframe actual al nuevo dataframe
+        clonarDatos(tmpDataFrame, nuevoInmueble)
+
+        // Establecemos el nuevo dataframe con las nuevas columnas
+        dataframe = tmpDataFrame
+
+        // Nuevo tipo de inmueble que almacena el dataframe
+        this.tipoActual = nuevoInmueble.javaClass
+
+        // Instancia del inmueble almacenado
+        this.instanciaTipoActual = nuevoInmueble
+
+        // Ya no podremos cambiar más el tipo de dato de este dataframe
+        this.seHaCambiadoTipo = true
+
+        // Guardamos los viejos nombres de columnas
+        val viejosNomCols = nomCols
+
+        // Establecemos los nuevos nombres de las columnas
+        this.nomCols = nuevoInmueble.obtenerNombreAtributos()
+
+        // Volvemos a comprobar si podemos guardar los datos
+        if (colsDataframesCoinciden(nomCols,viejosNomCols)){
+            permitirGuardado = true
+        }
+    }
+
+    /**
+     *  Clonamos los datos del dataframe actual al pasado
+     *  por parametro
+     *
+     *  @param nuevoDataframe: Nuevo dataframe al que le añadiremos los datos
+     *  @param nuevoInmueble: Tipo de inmueble nuevo
+     *
+     */
+    fun clonarDatos(nuevoDataframe: Table, nuevoInmueble: Inmueble){
+
+        val nuevaClase = nuevoInmueble.javaClass
+
+        // Recorremos las filas del dataframe
+        dataframe.forEach{fila ->
+
+            val nuevaInstancia = nuevaClase.newInstance()
+
+            // Recorremos cada columna
+            fila.columnNames().forEach{nomCol ->
+
+                // Obtenemos el valor de la celda actual
+                val valor = fila.getObject(nomCol)
+
+                // Establecemos los valores a la nueva instancia
+                nuevaInstancia.establecerValor(nomCol,valor,nuevaInstancia)
+            }
+
+
+            // Añadimos los valores al nuevo dataframe
+            nuevoDataframe.columns().forEach{ col ->
+
+                // Obtenemos el valor del objeto
+                val valor = nuevaInstancia.obtenerValorDe(col.name(),nuevaInstancia)
+
+                // Añadimos el valor al nuevo dataframe
+                nuevoDataframe.column(col.name()).appendCell(valor)
+            }
+        }
+    }
+
+
 
     /**
      * Covertimos los datos almacenados en el datafram en una lista
@@ -332,15 +493,15 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      *
      * @return ArrayList<T>: Lista con los inmuebles
      */
-    fun obtenerInmueblesAlmacenados(): ArrayList<T> {
+    fun obtenerInmueblesAlmacenados(): ArrayList<Inmueble> {
 
-        val listaInmuebles: ArrayList<T> = ArrayList()
+        val listaInmuebles: ArrayList<Inmueble> = ArrayList()
 
         // Recorremos cada tupla del dataframe
         dataframe.forEach{fila ->
 
             // Creamos una instancia del tipo de inmueble que se almacena en la tabla
-            val objInmueble = tipoActual.newInstance()
+            val objInmueble = tipoActual.newInstance() as Inmueble
 
             // Recorremos cada columna de la tupla actual
             fila.columnNames().forEach {nombreCol ->
@@ -354,7 +515,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
             }
 
             // Añadimos el inmueble a la lista
-            listaInmuebles.add(objInmueble as T)
+            listaInmuebles.add(objInmueble as Inmueble)
 
         }
 
@@ -370,7 +531,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
      */
     fun conectarConTransmisor(transmisor: Transmisor<T>){
         if (!transmisor.transmisionTerminada()){
-            this.transmisor = transmisor
+            this.transmisor = transmisor as Transmisor<Inmueble>
         }
     }
 }

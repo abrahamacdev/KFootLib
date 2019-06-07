@@ -14,6 +14,6 @@ class Vivienda: Inmueble {
     }
 
     override fun toString(): String {
-        return super.toString()
+        return "(Vivienda) " + super.toString() + ". Ademas tiene $numHabitaciones habitacion/es."
     }
 }
