@@ -1,12 +1,14 @@
 package com.kscrap.libreria.Modelo.Repositorio
 
 import com.andreapivetta.kolor.Color
+import com.google.common.base.Joiner
 import com.kscrap.libreria.Utiles.Constantes
 import com.kscrap.libreria.Utiles.Utils
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import java.util.regex.Pattern
 
 /**
  * {[guardadoAutomatico]} ->    Permite ejecutar un guardado periodicamente
@@ -90,6 +92,57 @@ class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String?
     }
 
     /**
+     * Establecemos la nueva ruta del archivo en el que
+     * se guardaran los datos
+     */
+    fun establecerRutaArchivo(rutaCompleta: String){
+
+        val ruta = File(rutaCompleta)
+
+        if (rutaCompleta.matches(Regex("^(?:\\/[A-z_:()0-9]+)*\\.[A-z0-9:_-]+")) && File(ruta.parent).exists()){
+
+            var spliteado = rutaCompleta.split("/")
+
+            // Nueva ruta
+            var rutaNueva = ""
+            for (i in 0 until spliteado.size-1){
+                rutaNueva += spliteado[i] + "/"
+            }
+
+            // Espliteamos el nombre del archivo y su extension
+            spliteado = spliteado.get(spliteado.size - 1).split(".")
+
+            // Nuevo nombre de archivo
+            val nuevoNombre = spliteado.get(0)
+
+            // Nueva extension
+            val nuevaExtension = obtenerExtension(spliteado.get(1))
+            if (nuevaExtension != null){
+                extensionArchivo = nuevaExtension
+                nombreArchivo = nuevoNombre
+                rutaGuardadoArchivos = rutaNueva
+            }
+        }
+    }
+
+    /**
+     * Obtenemos la extension que coincida con la pasada por parametro
+     *
+     * @param extension: Extension a comprobar si existe
+     *
+     * @return EXTENSIONES_ARCHIVOS?: La extension en caso de que esta exista
+     */
+    private fun obtenerExtension(extension: String): Constantes.EXTENSIONES_ARCHIVOS?{
+
+        // COmprobamos si existe alguna extension con el nombre que nos pasan por parametro
+        val extensionExistente = Constantes.EXTENSIONES_ARCHIVOS.values().firstOrNull{
+            extension.equals(it.name)
+        }
+
+        return extensionExistente
+    }
+
+    /**
      * Comprobamos si los intervalos que se setearán para el guardado automático son
      * válidos
      *
@@ -139,7 +192,7 @@ class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String?
      * @return String: Nombre del archivo por defecto
      */
     private fun obtenerNombreArchivoDefecto(): String{
-        val dtf: DateTimeFormatter = DateTimeFormatter.ofPattern("dd_MM_HH_mm")
+        val dtf: DateTimeFormatter = DateTimeFormatter.ofPattern("dd_MM_YYYY_HH:mm:ss")
         val ahora: LocalDateTime = LocalDateTime.now()
         return "KScrap_${dtf.format(ahora)}"
     }

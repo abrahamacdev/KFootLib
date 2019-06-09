@@ -26,7 +26,7 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
     private lateinit var configuracion: ConfiguracionRepositorioInmueble; // Configuracion que se usara para el repositorio
     private var transmisor: Transmisor<Inmueble>? = null                // Transmisor al que conectamos el el repositorio para el envío automático de los datos
 
-    private var guardadoRealizado = false                               // Primer guardado que realicemos para el repositorio actual
+    private var primerGuardadoRealizado = false                               // Primer guardado que realicemos para el repositorio actual
     private var permitirGuardado = true                                 // Permitira guardar los datos o por el contrario denegara la accion
     private var seHaCambiadoTipo = false                                // Permitira la modificacion de las columnas del dataframe en su estado inicial
     private var yaExisteArchivo: Boolean = false;                       // Comprobamos si el archivo ya ha sido creado
@@ -231,51 +231,63 @@ class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>?
             // Comprobamos que la tabla tenga datos para guardar
             if (dataframe.rowCount() > 0){
 
-                // Ejecutamos el proceso de escritura en una corutina dedicada
-                launch (coroutineContext){
+                // Guardaremos los datos en un csv
+                if (configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv){
 
-                    // Añadimos los datos al archivo
-                    val bufferedWriter = BufferedWriter(FileWriter(File(configuracion.getRutaGuardadoArchivos() + "/$nombreArchivo"),true))
+                    // Guardamos los datos en un CSV
+                    guardarCSV()
 
-                    // Evitamos que se escriba en el archivo desde otra parte
-                    synchronized(bufferedWriter){
-                        val opciones: CsvWriteOptions;
-
-                        // Si el archivo ya existe, no escribiremos las cabeceras
-                        if (yaExisteArchivo){
-                            opciones = CsvWriteOptions.builder(bufferedWriter).header(false).build()
-                        }
-
-                        // Sino las añadiremos
-                        else {
-                            opciones = CsvWriteOptions.builder(bufferedWriter).build()
-                        }
-
-
-                        dataframe.write().csv(opciones)         // Escribimos los datos en el archivo
-
-                        bufferedWriter.close()                  // Cerramos el búffer
-
-                        dataframe = dataframe.emptyCopy()       // Eliminamos los datos del dataframe
-
-                        // Si el archivo no existía ha sido creado
-                        if (!yaExisteArchivo){
-                            yaExisteArchivo = true
-                        }
-
-                        // COmprobamos si es el primer guardado que realizamos
-                        if (!guardadoRealizado){
-                            guardadoRealizado = true
-                        }
-
-                        // Avisaremos del guardado por el sujeto pasado como parametro
-                        if (avisoGuardado != null){
-                            avisoGuardado.onComplete()
-                        }
+                    // Avisamos de la finalizacion del guardado
+                    if (avisoGuardado != null){
+                        avisoGuardado.onComplete()
                     }
-                }.join()
+                }
             }
         }
+    }
+
+    /**
+     * Realizaremos el guardado de los datos en un archivo CSV
+     */
+    private suspend fun guardarCSV(){
+
+        // Ejecutamos el proceso de escritura en una corutina dedicada
+        launch (coroutineContext){
+
+            // Añadimos los datos al archivo
+            val bufferedWriter = BufferedWriter(FileWriter(File(configuracion.getRutaGuardadoArchivos() + "/$nombreArchivo"),true))
+
+            // Evitamos que se escriba en el archivo desde otra parte
+            synchronized(bufferedWriter){
+                val opciones: CsvWriteOptions
+
+                // Si el archivo ya existe, no escribiremos las cabeceras
+                if (yaExisteArchivo){
+                    opciones = CsvWriteOptions.builder(bufferedWriter).header(false).build()
+                }
+
+                // Sino las añadiremos
+                else {
+                    opciones = CsvWriteOptions.builder(bufferedWriter).build()
+                }
+
+                dataframe.write().csv(opciones)         // Escribimos los datos en el archivo
+
+                bufferedWriter.close()                  // Cerramos el búffer
+
+                dataframe = dataframe.emptyCopy()       // Eliminamos los datos del dataframe
+
+                // Si el archivo no existía ha sido creado
+                if (!yaExisteArchivo){
+                    yaExisteArchivo = true
+                }
+
+                // COmprobamos si es el primer guardado que realizamos
+                if (!primerGuardadoRealizado){
+                    primerGuardadoRealizado = true
+                }
+            }
+        }.join()
     }
 
     /**

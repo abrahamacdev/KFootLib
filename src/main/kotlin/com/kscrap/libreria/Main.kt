@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 fun main(args: Array<String>) = runBlocking<Unit> {
 
     val inmueble = Inmueble(
-        "Calle Solsticio",
+        "Calle Saturno",
         "Chiclana",
         300,
         300000.0,
@@ -24,7 +24,7 @@ fun main(args: Array<String>) = runBlocking<Unit> {
     )
 
     val vivienda2 = Vivienda(
-            "Calle Jupiter",
+            "Calle Venus",
             "Sanlucar",
             450,
             450000.0,
@@ -40,9 +40,10 @@ fun main(args: Array<String>) = runBlocking<Unit> {
     val propiedades = ConfiguracionRepositorioInmueble()
     with(propiedades){
         guardaLosDatosEn("/home/abraham/Documentos")
-        archivoConNombre("Prueba")
         archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.csv)
     }
+
+    propiedades.establecerRutaArchivo("/home/abraham/Documentos/archivo.csv")
 
     val c = RepositorioInmueble.create<Inmueble>(propiedades =  propiedades)
     c.anadirListaInmuebles(listaInmuebles)
