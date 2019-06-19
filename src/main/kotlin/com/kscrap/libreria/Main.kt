@@ -39,7 +39,8 @@ fun main(args: Array<String>) = runBlocking<Unit> {
 
     val propiedades = ConfiguracionRepositorioInmueble()
     with(propiedades){
-        guardaLosDatosEn("/home/abraham/Documentos")
+        guardaLosDatosEn("/home/abraham/DDocumentos")
+        archivoConNombre("Prueba")
         archivoConExtension(Constantes.EXTENSIONES_ARCHIVOS.csv)
     }
 
