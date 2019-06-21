@@ -6,7 +6,7 @@ plugins {
 
 apply plugin: 'kotlin'
 
-group 'com.Kscrap'
+group 'com'
 version '1.0'
 
 sourceCompatibility = 1.8
@@ -28,13 +28,12 @@ dependencies {
 
     // Habilitamos las coroutinas
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.1.1"
-
-    // Logs con color
-    compile "com.andreapivetta.kolor:kolor:0.0.2"
     
     // https://mvnrepository.com/artifact/tech.tablesaw/tablesaw-core
     compile group: "tech.tablesaw", name: "tablesaw-core", version: "0.32.7"
 
+    // Utiles de la libreria KFoot
+    compile fileTree(dir: 'libs/KFootUtils', include: '*.jar')
 }
 
 compileKotlin {
@@ -56,7 +55,7 @@ task copyToLib(type: Copy) {
     from configurations.runtime
 
     //into "$buildDir/libs/"          // Copia las dependencias directamente a 'libs', donde se produce el jar
-    into "$buildDir/output/KScrapLib"
+    into "$buildDir/output/KFootLib"
 }
 
 //   Using dependency list to generate a manifest with appropriate classpath
@@ -69,6 +68,6 @@ jar {
         into ("lib/")
     }*/
     //from configurations.compile.collect { fileTree(dir: "$buildDir/libs/lib") }
-    destinationDir = file("$buildDir/output/KScrapLib")
+    destinationDir = file("$buildDir/output/KFootLib")
 }
 /* --------------------------- */

@@ -1,8 +1,7 @@
-package com.kscrap.libreria.Modelo.Dominio
+package lib.Plugin.Modelo.Dominio
 
-import com.kscrap.libreria.Utiles.TIPOS_CONTRATOS
+import lib.Plugin.Utiles.TIPOS_CONTRATOS
 import java.lang.reflect.Field
-import java.util.*
 import kotlin.collections.ArrayList
 
 /**

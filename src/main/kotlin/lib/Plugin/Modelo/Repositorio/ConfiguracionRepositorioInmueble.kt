@@ -1,14 +1,11 @@
-package com.kscrap.libreria.Modelo.Repositorio
+package lib.Plugin.Modelo.Repositorio
 
 import com.andreapivetta.kolor.Color
-import com.google.common.base.Joiner
-import com.kscrap.libreria.Utiles.Constantes
-import com.kscrap.libreria.Utiles.Utils
+import lib.Plugin.Utiles.Utils
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
-import java.util.regex.Pattern
 
 /**
  * {[guardadoAutomatico]} ->    Permite ejecutar un guardado periodicamente
@@ -19,7 +16,7 @@ import java.util.regex.Pattern
  * {[extensionArchivo]} ->             Extensión que usará el archivo. Por defecto será "csv"
  */
 class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
-                  private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.csv) {
+                                       private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.csv) {
 
     init {
 

@@ -1,18 +1,16 @@
-package com.kscrap.libreria.Modelo.Repositorio
+package lib.Plugin.Modelo.Repositorio
 
 import com.andreapivetta.kolor.Color
-import com.kscrap.libreria.Modelo.Dominio.Inmueble
-import com.kscrap.libreria.Utiles.Constantes
-import com.kscrap.libreria.Utiles.Utils
+import lib.Plugin.Modelo.Dominio.Inmueble
+import lib.Plugin.Utiles.Utils
 import kotlinx.coroutines.*
 import tech.tablesaw.api.Table
 import tech.tablesaw.io.csv.CsvWriteOptions
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-import com.kscrap.libreria.Controlador.Transmisor
+import lib.Plugin.Controlador.Transmisor
 import io.reactivex.subjects.PublishSubject
-import tech.tablesaw.api.Row
 import kotlin.coroutines.CoroutineContext
 
 class RepositorioInmueble<T: Inmueble>(clazz: Class<T>, listaInmuebles: List<T>? = null, configuracion: ConfiguracionRepositorioInmueble = ConfiguracionRepositorioInmueble()): CoroutineScope {
