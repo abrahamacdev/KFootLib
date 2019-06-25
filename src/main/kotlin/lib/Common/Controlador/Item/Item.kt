@@ -1,41 +1,14 @@
-package lib.Plugin.Modelo.Dominio
+package lib.Common.Controlador.Item
 
-import lib.Plugin.Utiles.TIPOS_CONTRATOS
 import java.lang.reflect.Field
 import kotlin.collections.ArrayList
 
 /**
- * Esta clase ofrece un modelo básico a seguir por los inmuebles
- * más avanzados que se vayan a crear.
- * * Es <b>obligatorio</b> que todos los inmuebles que hereden esta clase
- * tengan un constructor vacío.
- * ** Es <b>obligatorio</b> que todos los inmuebles que hereden esta clase
- * tengan variables que solo guarden datos referente al inmueble.
+ * Esta clase servirá como base para la elaboración de
+ * items más elaborados. Nos ayudará a crear una abstracción
+ * común con la que guardar datos
  */
-open class Inmueble {
-
-    var calle: String = ""
-    var ciudad: String = ""
-    var m2: Int = -1
-    var precio: Double = -1.0
-    var moneda: String = ""
-    var contrato: String = TIPOS_CONTRATOS.TIPO_CONTRATO_DESCONOCIDO.value
-    var numTelefono: String = ""
-    var urlDetalle: String = ""
-
-
-    constructor()
-
-    constructor(calle: String, ciudad: String, m2: Int, precio: Double, moneda: String, contrato: TIPOS_CONTRATOS, numTelefono: String, urlDetalle: String) {
-        this.calle = calle
-        this.ciudad = ciudad
-        this.m2 = m2
-        this.precio = precio
-        this.moneda = moneda
-        this.contrato = contrato.value
-        this.numTelefono = numTelefono
-        this.urlDetalle = urlDetalle
-    }
+abstract class Item {
 
     /**
      * Devuelve los nombres de las variables almacenadas en el objeto (calle,ciudad,m2...ect)
@@ -74,25 +47,6 @@ open class Inmueble {
         return nombreTipo
     }
 
-    /**
-     * Devolvemos el valor de la variable solicitada si esta existe
-     *
-     * @param atributo: Atributo a buscar en el objeto
-     * @param obj: Instancia del objeto
-     *
-     * @return String Valor del atributo si este existe
-     */
-    final fun obtenerValorDe(atributo: String, obj: Any): String?{
-
-        val campo = buscarCampo(atributo)
-
-        if (campo != null){
-            campo.isAccessible = true
-            return campo.get(obj).toString()
-        }
-
-        return null
-    }
 
     /**
      * Buscamos en el objeto actual, un campo con el nombre
@@ -140,6 +94,27 @@ open class Inmueble {
         return campos
     }
 
+
+    /**
+     * Devolvemos el valor de la variable solicitada si esta existe
+     *
+     * @param atributo: Atributo a buscar en el objeto
+     * @param obj: Instancia del objeto
+     *
+     * @return String Valor del atributo si este existe
+     */
+    final fun obtenerValorDe(atributo: String, obj: Any): String?{
+
+        val campo = buscarCampo(atributo)
+
+        if (campo != null){
+            campo.isAccessible = true
+            return campo.get(obj).toString()
+        }
+
+        return null
+    }
+
     /**
      *  Establecemos el valor pasado por parámetro
      *  en el campo solicitado
@@ -185,7 +160,8 @@ open class Inmueble {
     }
 
 
+
     override fun toString(): String {
-        return "Inmueble localizado en $ciudad. Tiene ${m2}m2 y cuesta ${precio}$moneda"
+        return ""
     }
 }

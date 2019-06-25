@@ -1,4 +1,4 @@
-package lib.Plugin.Utiles
+package lib.Common.Utiles
 
 import KFoot.Constantes
 import KFoot.Utils.debug

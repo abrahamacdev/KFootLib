@@ -1,7 +1,8 @@
-package lib.Plugin.Modelo.Repositorio
+package lib.Common.Controlador.Item
 
+import KFoot.Constantes
+import KFoot.Utils
 import com.andreapivetta.kolor.Color
-import lib.Plugin.Utiles.Utils
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -15,8 +16,8 @@ import java.util.concurrent.TimeUnit
  * {[nombreArchivo]} ->         Nombre que tendra el archivo. Por defecto se le asignará uno si el valor de este es "null"
  * {[extensionArchivo]} ->             Extensión que usará el archivo. Por defecto será "csv"
  */
-class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String? = Utils.obtenerDirDocumentos(),
-                                       private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.csv) {
+class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = KFoot.Utils.obtenerDirDocumentos(),
+                                    private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.csv) {
 
     init {
 
@@ -34,9 +35,10 @@ class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String?
         }
 
     }
+
     /**
      * Establecemos la ruta en la que se guardará
-     * el {[RepositorioInmueble]}
+     * el {[lib.Plugin.Modelo.Dominio.Item]}
      *
      * @param ruta String: Ruta a utilizar para el guardado
      */
@@ -122,6 +124,8 @@ class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String?
         }
     }
 
+
+
     /**
      * Obtenemos la extension que coincida con la pasada por parametro
      *
@@ -149,7 +153,7 @@ class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String?
      * @return Boolean: Si los intervalos a setear son válidos
      */
     private fun intervalosGuardadoAutValidos(intervalos: Long, unidadTiempo: TimeUnit): Boolean{
-        if ((intervalos < 3000000000 && unidadTiempo == TimeUnit.NANOSECONDS) || (intervalos < 3000 && unidadTiempo == TimeUnit.MILLISECONDS) ){
+        if ((intervalos < 3000000000 && unidadTiempo == TimeUnit.NANOSECONDS) || (intervalos < 3000 && unidadTiempo == TimeUnit.MILLISECONDS) || (intervalos < 3 && unidadTiempo == TimeUnit.SECONDS)){
             return false
         }
 
@@ -193,6 +197,8 @@ class ConfiguracionRepositorioInmueble(private var rutaGuardadoArchivos: String?
         val ahora: LocalDateTime = LocalDateTime.now()
         return "KScrap_${dtf.format(ahora)}"
     }
+
+
 
     fun getRutaGuardadoArchivos(): String?{
         return this.rutaGuardadoArchivos
