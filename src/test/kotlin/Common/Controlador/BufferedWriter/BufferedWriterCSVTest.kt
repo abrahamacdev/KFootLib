@@ -1,4 +1,4 @@
-package Common.Controlador
+package Common.Controlador.BufferedWriter
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -25,9 +25,8 @@ class BufferedWriterCSVTest {
 
         @JvmStatic
         @AfterAll
-        fun eliminar_archivo_ejemplo(){
+        fun finalizar(){
 
-            System.gc()
             val f = File(rutaArchivoPrueba)
             f.delete()
             println("Ejecutado")
@@ -55,7 +54,7 @@ class BufferedWriterCSVTest {
         table.column("Nombre").appendCell("Pepe")
         table.column("Nombre").appendCell("Juan")
 
-        val fuente = FuenteDatos(table,true)
+        val fuente = FuenteDatos(table)
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)
@@ -92,7 +91,7 @@ class BufferedWriterCSVTest {
             table.column("Id").appendCell(i.toString())
         }
 
-        val fuente = FuenteDatos(table,true)
+        val fuente = FuenteDatos(table)
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)
@@ -139,7 +138,7 @@ class BufferedWriterCSVTest {
             table.column("Id").appendCell(i.toString())
         }
 
-        val fuente = FuenteDatos(table,true)
+        val fuente = FuenteDatos(table)
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)

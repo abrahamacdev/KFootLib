@@ -29,7 +29,7 @@ class FuenteDatosTest {
         table.column("Nombre").appendCell("Pepe")
         table.column("Nombre").appendCell("Juan")
 
-        val fuente = FuenteDatos(table,true)
+        val fuente = FuenteDatos(table)
 
         var  i = 0
 

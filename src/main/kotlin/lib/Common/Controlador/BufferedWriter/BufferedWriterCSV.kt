@@ -1,11 +1,14 @@
 package lib.Common.Controlador.BufferedWriter
 
 import KFoot.Constantes
+import KFoot.Utils
 import com.andreapivetta.kolor.Color
+import io.reactivex.Completable
+import kotlinx.coroutines.*
 import lib.Common.Modelo.FuenteDatos
-import java.io.BufferedWriter
-import java.io.File
-import java.io.FileWriter
+import java.io.*
+import java.nio.charset.StandardCharsets
+import kotlin.coroutines.*
 
 class BufferedWriterCSV: IBufferedWriter {
 
@@ -24,8 +27,20 @@ class BufferedWriterCSV: IBufferedWriter {
     // Separador del archivo CSV
     private var separador = ","
 
+    // Último contexto utilizado
+    @Volatile
+    private var ultContexto: CoroutineContext? = null
+
+    // Contexto de la coroutina
+    var job: Job? = null
+    var scope: CoroutineScope? = null
+    var completableDeferred: CompletableDeferred<Unit>? = null
+
+    @Volatile
     private var guardando = false
+    @Volatile
     private var pausado = false
+    @Volatile
     private var cancelado = false
 
     /**
@@ -64,7 +79,7 @@ class BufferedWriterCSV: IBufferedWriter {
             if (f.absolutePath.endsWith(".csv")){
 
                 // Comprobamos que la ruta del archivo existe
-                var ruta = File(f.path.split(Regex("\\w*[-_#@]*\\.csv$"))[0])
+                var ruta = File(rutaArchivo.split(Regex("(?:\\/[\\w-_:](?:[\\w-_:])*\\.csv)\$"))[0])
 
                 // Comprobamos que la ruta exista
                 if (ruta.isDirectory && ruta.exists()){
@@ -122,7 +137,7 @@ class BufferedWriterCSV: IBufferedWriter {
      * Guardamos los datos almacenados en la [fuenteDatos]
      * en el archivo con ruta [archivo]
      */
-    override fun guardar() {
+    override fun guardar() = runBlocking {
 
         // Comprobamos si supera todas las comprobaciones previas al guardado
         if (superaComprobacionesPrevias()){
@@ -131,13 +146,72 @@ class BufferedWriterCSV: IBufferedWriter {
             guardando = true
 
             // Abrimos el writer
-            bufferedWriter = BufferedWriter(FileWriter(archivo,true))
+            bufferedWriter = BufferedWriter(OutputStreamWriter(FileOutputStream(archivo,true),StandardCharsets.UTF_8))
 
             // Escribimos la información en el archivos
-            escribir()
+            guardar(coroutineContext)
         }
     }
 
+    /**
+     * Guardamos los datos almacenados en la [fuenteDatos]
+     * en el archivo con ruta [archivo] de forma asíncrona
+     *
+     * @return Deffered<Unit>: Futuro del guardado
+     */
+    fun guardarAsync(): CompletableDeferred<Unit>? {
+
+        if (superaComprobacionesPrevias()){
+
+            // Completable que avisará de la finalización del guardado
+            completableDeferred = CompletableDeferred()
+
+            // Creamos el alcance de la coroutina
+            job = Job()
+            scope = CoroutineScope(Dispatchers.IO + job!!)
+
+            // Comenzamos el guardado de forma asíncrona
+            scope!!.launch {
+                guardar(scope!!.coroutineContext)
+            }
+
+            return completableDeferred
+        }
+        return null
+    }
+
+    /**
+     * Guardamos los datos almacenados en la [fuenteDatos]
+     * en el archivo con ruta [archivo]
+     *
+     * @param coroutineContext: Contexto en el que se está ejecutando el guardado
+     */
+    private suspend fun guardar(coroutineContext: CoroutineContext?) {
+
+        // Cambiamos el estado del writer
+        guardando = true
+
+        // Abrimos el writer
+        bufferedWriter = BufferedWriter(OutputStreamWriter(FileOutputStream(archivo,true),StandardCharsets.UTF_8))
+
+        // Guardamos el nuevo contexto
+        if (coroutineContext != null){
+            ultContexto = coroutineContext
+        }
+
+        // Iniciamos el proceso de escritura bajo el último contexto
+        if (ultContexto != null){
+
+            // Escribimos en el archivo
+            withContext(ultContexto!!){
+                escribir()
+            }
+        }
+    }
+
+
+    var guardados = 0
+    var mostrarCada = 50000
     /**
      * Escribimos toda la informacion de la [fuenteDatos] en
      * el archivo CSV con ruta [archivo]
@@ -149,6 +223,12 @@ class BufferedWriterCSV: IBufferedWriter {
 
             // Comprobamos que el guardado no se halla cancelado|pausado y halla filas por escribir
             while (!cancelado && !pausado && fuenteDatos!!.hayMasFilas()){
+
+                // TODO
+                guardados++
+                if (guardados % mostrarCada == 0){
+                    Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"Guardando (${Thread.currentThread().name}) (Guardado nº$guardados)")
+                }
 
                 // Escribimos las cabeceras en el archivo
                 if (escribirCabeceras && !cabeceraEscrita){
@@ -181,6 +261,11 @@ class BufferedWriterCSV: IBufferedWriter {
             if (cancelado || !fuenteDatos!!.hayMasFilas()){
                 guardadoTerminado()
             }
+
+            // TODO
+            if (pausado){
+                Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"Ups, parece que han pausado el guardado")
+            }
         }
     }
 
@@ -196,6 +281,7 @@ class BufferedWriterCSV: IBufferedWriter {
 
             // Comprobamos que haya una fuente de datos
             if (fuenteDatos != null){
+
                 return true
             }
         }
@@ -203,13 +289,35 @@ class BufferedWriterCSV: IBufferedWriter {
     }
 
 
+
     override fun pausarGuardado() {
         pausado = true
     }
 
     override fun reanudarGuardado() {
+
+        // TODO
+        Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"Retomamos el guardado")
+
         pausado = false
-        escribir()
+
+        // Guardado asíncrono
+        if (scope != null){
+
+            job = Job()
+            scope = CoroutineScope(job!! + Dispatchers.IO)
+
+            scope!!.launch {
+                guardar(coroutineContext)
+            }
+        }
+
+        // Guardado síncrono
+        else {
+            runBlocking {
+                guardar(coroutineContext)
+            }
+        }
     }
 
     override fun cancelarGuardado() {
@@ -221,18 +329,33 @@ class BufferedWriterCSV: IBufferedWriter {
      * se halla terminado el guardado o se halla cancelado
      */
     private fun guardadoTerminado(){
+
+        // Permitimos que se vuelva a ejecutar el guardado
         guardando = false
 
+        // Cerramos el buffer
         if (bufferedWriter != null){
 
             bufferedWriter!!.close()
             bufferedWriter = null
         }
 
+        // Comprobamos si el guardado estaba siendo asíncrono
+        if(scope != null){
 
-        println(guardando)
-        println(cancelado)
-        println(pausado)
-        println(bufferedWriter)
+            println(job!!.isCompleted)
+
+            // Terminamos la ejecución de la coroutina
+            completableDeferred!!.complete(Unit)
+
+            // Cancelamos la ejecución de la coroutina
+            job!!.cancel()
+
+            println(job!!.isCompleted)
+
+            // Eliminamos la coroutina
+            job = null
+            scope = null
+        }
     }
 }

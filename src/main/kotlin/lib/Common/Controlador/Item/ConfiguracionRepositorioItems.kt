@@ -193,7 +193,7 @@ class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = 
      * @return String: Nombre del archivo por defecto
      */
     private fun obtenerNombreArchivoDefecto(): String{
-        val dtf: DateTimeFormatter = DateTimeFormatter.ofPattern("dd_MM_YYYY_HH:mm:ss")
+        val dtf: DateTimeFormatter = DateTimeFormatter.ofPattern("dd_MM_YYYY_HHmmss")
         val ahora: LocalDateTime = LocalDateTime.now()
         return "KScrap_${dtf.format(ahora)}"
     }

@@ -1,7 +1,6 @@
 package lib.Common.Modelo
 
 import lib.Common.Utiles.Utils
-import tech.tablesaw.api.Row
 import tech.tablesaw.api.Table
 import tech.tablesaw.columns.Column
 
@@ -21,6 +20,7 @@ class FuenteDatos {
     constructor(table: Table){
         crearFuenteDeDatos(table)
     }
+
 
 
     fun getCabeceras(): ArrayList<String>{
@@ -59,43 +59,47 @@ class FuenteDatos {
      *
      * @param columna: Columna de la que obtendremos los datos
      */
-    fun anadirDatos(columna: Column<Any>){
+    fun anadirDatos(columna: Column<Any?>){
 
         // No existe ninguna cabecera con el nombre de la columna
         if (cabeceras.indexOf(columna.name()) == -1){
             cabeceras.add(columna.name())
-            valores.put(columna.name(), columna)
         }
 
         // Ya existe la cabecera, actualizamos los datos de la columa
         else {
 
-            val nuevaColumna = valores.get(columna.name())
+            // Obtenemos el tipo y la columna segun el nombre de la cabecera
+            val nuestraColumna = valores.get(columna.name())
 
             // Comprobamos que el tipo de dato de la vieja columna coincida con el de la nueva columna
-            if (nuevaColumna!!.type() == columna.type()){
+            if (columna.type() == nuestraColumna!!.type()){
 
                 // Añadimos a la vieja columna los datos de la nueva
-                columna.forEach { nuevaColumna.append(it) }
+                columna.forEach {
+                    if (it != null){
+                        nuestraColumna.append(it)
+                    }
+                 }
 
-                // Actualizamos los cambios de la variable #valores
-                valores.replace(columna.name(), nuevaColumna)
+                // Actualizamos los cambios
+                valores.replace(columna.name(), nuestraColumna)
+
+                // Actualizamos el valor de la columna con más tuplas
+                if (nuestraColumna.count() > numMayTupla){
+                    numMayTupla = columna.count()
+                }
             }
-        }
-
-        // Guardamos el valor de la última tupla
-        if (columna.count() > numMayTupla){
-            numMayTupla = columna.count()
         }
     }
 
     /**
-     * Añadimos los datos de una columna a la fuente de datos
+     * Añadimos los datos de una lista a la fuente de datos
      *
      * @param listaValores: Lista de la que obtendremos los datos
      * @param nombreCabecera: Nombre de la cabecera a la que pertenece
      */
-    fun anadirDatos(listaValores: List<Any>, nombreCabecera: String){
+    fun anadirDatos(listaValores: List<Any?>, nombreCabecera: String){
 
         // Comprobamos si hay elementos en la lista
         if(listaValores.size > 0){
@@ -107,48 +111,119 @@ class FuenteDatos {
                 cabeceras.add(nombreCabecera)
 
                 // Tipo de dato que se almacena en la lista
-                val tipoAlmacenado = listaValores.get(0).javaClass
+                var tipoAlmacenado: Class<*> = this.javaClass
+                for (i in 0 until listaValores.size){
+                    val tmp = listaValores.get(i)
+
+                    if (tmp != null){
+                        tipoAlmacenado = tmp.javaClass
+                    }
+                }
+
+                // Si todos los valores son nulos no los añadiremos a la fuente de datos
+                if (tipoAlmacenado == this.javaClass){
+                    return
+                }
 
                 // Añadimos todos los valores de la lista a la fuente de datos
                 val column = Utils.castearAColumna(nombreCabecera, tipoAlmacenado)
 
-                // Añadimos todos los valores de la lista a la columna
-                listaValores.forEach {
-                    if (it.javaClass == tipoAlmacenado){
-                        column!!.appendCell(it.toString())
+                // Añadimos la columna al map de valores
+                valores.put(nombreCabecera,column as Column<Any>)
+            }
+
+            // Obtenemos el tipo y la columna segun el nombre de la cabecera
+            val columna = valores.get(nombreCabecera)
+            val tipoDato = columna!!.get(0)!!.javaClass
+
+            // Añadimos todos los valores de la lista a la columna
+            listaValores.forEach {
+
+                // Comprobamos que haya algún objeto
+                if (it != null){
+
+                    // Comprobamos que el tipo de dato del objeto coincida con el de
+                    // la columna
+                    if (it.javaClass == tipoDato){
+                        columna.appendCell(it.toString())
                     }
                 }
+
             }
 
-            // Añadimos los datos a la columna ya existente
-            else {
-
-                val nuevaColumna = valores.get(nombreCabecera)
-                val tipoDato = nuevaColumna!!.get(0).javaClass
-
-                // Comprobamos que el tipo de dato de la vieja columna coincida con el de la nueva columna
-                if (nuevaColumna!!.type().name().equals(nombreCabecera)){
-
-                    // Añadimos a la vieja columna los datos de la nueva
-                    listaValores.forEach {
-
-                        // Comprobamos que el tipo de dato del objeto
-                        // coincida con el que se almacena
-                        if (tipoDato == it.javaClass){
-                            nuevaColumna.append(it)
-                        } }
-
-                    // Actualizamos los cambios de la variable #valores
-                    valores.replace(nombreCabecera, nuevaColumna)
-                }
-            }
+            // Actualizamos los cambios de la variable #valores
+            valores.replace(nombreCabecera, columna)
 
             // Guardamos el valor de la última tupla
-            if (listaValores.count() > numMayTupla){
+            if (columna.count() > numMayTupla){
                 numMayTupla = listaValores.size
             }
         }
     }
+
+    /**
+     * Añadimos los datos de una fila completa a la fuente de datos
+     *
+     * @param fila: Map del que obtendremos los datos
+     */
+    fun anadirDatosFila(fila: Map<String, Any?>){
+
+        // Comprobamos si hay elementos en el map
+        if(fila.size > 0){
+
+            // Recorremos cada una de las claves del map
+            fila.forEach {
+
+                // Si el valor es nulo no lo insertaremos
+                if (fila.getValue(it.key) == null){
+                    return
+                }
+
+                // Comprobamos si la cabecera existe en la lista de cabeceras
+                if(cabeceras.indexOf(it.key) == -1){
+
+                    // Añadimos la cabecera a la lista de cabeceras
+                    cabeceras.add(it.key)
+
+
+                    // Tipo de dato que se almacena en el map
+                    val tipoAlmacenado = fila.getValue(it.key)!!.javaClass
+
+                    // Añadimos todos los valores de la lista a la fuente de datos
+                    val column = Utils.castearAColumna(it.key, tipoAlmacenado)
+
+                    // Añadimos la columna
+                    valores.put(it.key, column as Column<Any>)
+                }
+
+                // Obtenemos el tipo y la columna segun el nombre de la cabecera
+                val columna = valores.get(it.key)
+                val tipoDato = columna!!.type().name().toLowerCase()
+
+                // Añadimos el valor a la columna si coincide con
+                // el tipo de la columna
+                val valor = fila.getValue(it.key)
+                val tipoValorSpliteado = valor!!.javaClass.toString().split(".")
+                val tipoValor = tipoValorSpliteado.get(tipoValorSpliteado.size - 1).toLowerCase()
+
+                // Comprobamos que el tipo del valor sea igual que el de la columna
+                if (tipoValor.equals(tipoDato)){
+                    columna.appendCell(valor.toString())
+                }
+
+                // Actualizamos los cambios de la variable #valores
+                valores.replace(it.key, columna)
+
+                // Actualizamos el valor de la columna con más tuplas
+                val cuentaColumna = columna.count()
+
+                if (cuentaColumna > numMayTupla){
+                    numMayTupla = cuentaColumna
+                }
+            }
+        }
+    }
+
 
 
     /**
@@ -159,6 +234,7 @@ class FuenteDatos {
      */
     fun siguienteFila(): ArrayList<String>? {
 
+        // Datos de la fila
         var fila:  ArrayList<String>? = null
 
         // Comprobamos que aún halla tuplas por recorrer

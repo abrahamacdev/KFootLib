@@ -7,6 +7,9 @@ import kotlinx.coroutines.*
 import tech.tablesaw.api.Table
 import java.io.File
 import io.reactivex.subjects.PublishSubject
+import lib.Common.Controlador.BufferedWriter.BufferedWriterCSV
+import lib.Common.Controlador.BufferedWriter.IBufferedWriter
+import lib.Common.Modelo.FuenteDatos
 import tech.tablesaw.io.csv.CsvWriteOptions
 import java.io.BufferedWriter
 import java.io.FileWriter
@@ -26,6 +29,8 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
 
     // --- Lógica de la clase ---
     private var seHaCambiadoTipo = false                            // Permitira la modificacion de las columnas del dataframe en su estado inicial
+    private var fuenteDatos: FuenteDatos = FuenteDatos()            // Fuente de datos que proporcionaremos al writer
+    private var bufferedWriter: IBufferedWriter? = null             // Buffered writer
     // -----
 
     // --- Coroutina de la clase ---
@@ -101,6 +106,9 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
             }
         }
 
+        // Fila que pasaremos a la fuente de datos
+        val fila: HashMap<String, Any?> = HashMap()
+
         // Recorremos cada atributo del item
         nomCols.forEach { atributo ->
 
@@ -109,8 +117,14 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
             // Evitamos setear valores extraños al dataframe
             if (valor != null){
                 dataframe.column(atributo).appendCell(valor)
+
+                // Guardamos el valor en la fila
+                fila.put(atributo,valor)
             }
         }
+
+        // Añadimos los datos a la fuente de datos
+        fuenteDatos.anadirDatosFila(fila)
     }
 
     /**
@@ -138,27 +152,25 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
 
 
     /**
-     * Ejecutamos un volcado de datos en el archivo
-     * y directorio deseados. Se creará un nuevo hilo que será el encargado de
-     * guardar los datos bloqueando el archivo.
+     * Guardamos los datos del dataframe según la configuracion
+     * pasada en el constructor
+     * @see [configuracion]
      *
      *  @return PublishSubject<Nothing>?: que nos permitira saber cuando se ha completado el guardado
      */
-    suspend fun guardar(): PublishSubject<Nothing>? {
+    fun guardar(): PublishSubject<Nothing>? {
 
-        // Comprobamos que el guardado este permitido
-        if (permitirGuardado){
+        // Realizamos el guardado
+        async(coroutineContext){
 
             // Comprobamos que la tabla tenga datos para guardar
             if (!todoGuardado()){
 
-                // Sujeto por el que transmitiremos la finalizacion del guardado
-                val avisoGuardado: PublishSubject<Nothing> = PublishSubject.create()
-
                 when {
-
                     // Se guardará en un archivo CSV
-                    configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv -> { guardarCSV(avisoGuardado) }
+                    configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv -> {
+                        guardarCSV()
+                    }
                 }
             }
         }
@@ -168,48 +180,24 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
 
     /**
      * Realizaremos el guardado de los datos en un archivo CSV
-     *
-     * @param Sujeto que nos permitira saber cuando se ha completado el guardado
+     * de forma síncrona
      */
-    private suspend fun guardarCSV(avisoGuardado: PublishSubject<Nothing>?){
+    private fun guardarCSV(){
 
-        // Ejecutamos el proceso de escritura en una corutina dedicada
-        launch (coroutineContext){
+        val bufferedWriterCSV = BufferedWriterCSV.Builder()
+                .escribirCabeceras(true)
+                .guardarEn(configuracion.getRutaGuardadoArchivos() + "/${configuracion.getNombreArchivo()}.${configuracion.getExtensionArchivo().name}")
+                .obtenerDatosDe(fuenteDatos)
+                .build()
 
-            // Añadimos los datos al archivo
-            val bufferedWriter = BufferedWriter(FileWriter(File(configuracion.getRutaGuardadoArchivos() + "/$nombreArchivo"),true))
+        // Guardamos la instancia del writer que utilizamos para guardar los datos
+        bufferedWriter = bufferedWriterCSV
 
-            // Evitamos que se escriba en el archivo desde otra parte
-            synchronized(bufferedWriter){
-                val opciones: CsvWriteOptions
+        // Guardamos los datos en el archivo
+        bufferedWriterCSV.guardar()
 
-                opciones = CsvWriteOptions.builder(bufferedWriter).build()
-
-                // Escribimos los datos en el archivo
-                dataframe.write().csv(opciones)
-
-                // Cerramos el búffer
-                bufferedWriter.close()
-
-                // Eliminamos los datos del dataframe
-                dataframe = dataframe.emptyCopy()
-
-                // Comprobamos si es el primer guardado que realizamos
-                if (!primerGuardadoRealizado){
-                    primerGuardadoRealizado = true
-                }
-            }
-        }.join()
-    }
-
-    /**
-     * Comprobamos si aún quedan datos en el
-     * {[dataframe]}
-     *
-     * @param Boolean si aún quedan datos
-     */
-    fun todoGuardado(): Boolean{
-        return dataframe.count() == 0
+        // Limpiamos los datos del dataframe
+        dataframe.clear()
     }
 
 
@@ -270,7 +258,7 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      * @param df: Tabla a la que se le asignaran las columnas
      * @param item: Item del que estraeremos las columnas a establecer en [df]
      */
-    fun anadirColsDataframe(df: Table, item: Item){
+    private fun anadirColsDataframe(df: Table, item: Item){
 
         val listaAtributos = item.obtenerNombreTipoAtributos()
 
@@ -356,7 +344,7 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      *  @param nuevoItem: Tipo de inmueble nuevo
      *
      */
-    fun clonarDatos(nuevoDataframe: Table, nuevoItem: Item){
+    private fun clonarDatos(nuevoDataframe: Table, nuevoItem: Item){
 
         val nuevaClase = nuevoItem.javaClass
 
@@ -423,5 +411,15 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
         }
 
         return listaItems
+    }
+
+    /**
+     * Comprobamos si aún quedan datos en el
+     * {[dataframe]}
+     *
+     * @param Boolean si aún quedan datos
+     */
+    fun todoGuardado(): Boolean{
+        return dataframe.count() == 0
     }
 }
