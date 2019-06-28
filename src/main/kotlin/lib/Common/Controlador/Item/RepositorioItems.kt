@@ -1,21 +1,19 @@
 package lib.Common.Controlador.Item
 
 import KFoot.Constantes
-import com.andreapivetta.kolor.Color
+import KFoot.IMPORTANCIA
+import KFoot.Logger
 import lib.Common.Utiles.Utils
 import kotlinx.coroutines.*
 import tech.tablesaw.api.Table
-import java.io.File
 import io.reactivex.subjects.PublishSubject
 import lib.Common.Controlador.BufferedWriter.BufferedWriterCSV
+import lib.Common.Controlador.BufferedWriter.GuardadoAsyncListener
 import lib.Common.Controlador.BufferedWriter.IBufferedWriter
 import lib.Common.Modelo.FuenteDatos
-import tech.tablesaw.io.csv.CsvWriteOptions
-import java.io.BufferedWriter
-import java.io.FileWriter
 import kotlin.coroutines.CoroutineContext
 
-class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null, val configuracion: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()): CoroutineScope {
+class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null, val configuracion: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()){
 
     // --- Tipo de dato del Repositorio ---
     private var instanciaTipoActual: Item = clazz.newInstance()      // Nos servirá más adelante para obtener la información de los items que se creen
@@ -31,12 +29,6 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
     private var seHaCambiadoTipo = false                            // Permitira la modificacion de las columnas del dataframe en su estado inicial
     private var fuenteDatos: FuenteDatos = FuenteDatos()            // Fuente de datos que proporcionaremos al writer
     private var bufferedWriter: IBufferedWriter? = null             // Buffered writer
-    // -----
-
-    // --- Coroutina de la clase ---
-    val job = Job()                                                 // Tarea asociada a la coroutina
-    override val coroutineContext: CoroutineContext                 // Contexto de la coroutina
-        get() = Dispatchers.IO + job
     // -----
 
     companion object {
@@ -101,7 +93,7 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
 
             // El item recibido es diferente al actual y ya hemos modificado el tipo de dato almacenado
             else {
-                KFoot.Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE, "El tipo de item almacenado en el repositorio ya ha sido modificado. El item no se guardara.", Color.RED)
+                Logger.getLogger().debug(KFoot.DEBUG.DEBUG_SIMPLE, "El tipo de item almacenado en el repositorio ya ha sido modificado. El item no se guardara.", IMPORTANCIA.ALTA)
                 return
             }
         }
@@ -158,34 +150,29 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      *
      *  @return PublishSubject<Nothing>?: que nos permitira saber cuando se ha completado el guardado
      */
-    fun guardar(): PublishSubject<Nothing>? {
+    fun guardar(): CompletableDeferred<Unit>? {
 
-        // Realizamos el guardado
-        async(coroutineContext){
+        var completableDeferred: CompletableDeferred<Unit>? = null
 
-            // Comprobamos que la tabla tenga datos para guardar
-            if (!todoGuardado()){
-
-                when {
-                    // Se guardará en un archivo CSV
-                    configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv -> {
-                        guardarCSV()
-                    }
-                }
+        when {
+            // Se guardará en un archivo CSV
+            configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv -> {
+                completableDeferred = guardarCSV()
             }
         }
-
-        return null
+        return completableDeferred
     }
 
     /**
      * Realizaremos el guardado de los datos en un archivo CSV
-     * de forma síncrona
+     * de forma asíncrona
+     *
+     * @return CompletableDeferred<Unit>?: Deferred con el que podremos esperar a la finalización del guardado
      */
-    private fun guardarCSV(){
+    private fun guardarCSV(): CompletableDeferred<Unit>?{
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
-                .escribirCabeceras(true)
+                .escribirCabecerasSiNoExisteArchivo()
                 .guardarEn(configuracion.getRutaGuardadoArchivos() + "/${configuracion.getNombreArchivo()}.${configuracion.getExtensionArchivo().name}")
                 .obtenerDatosDe(fuenteDatos)
                 .build()
@@ -193,11 +180,26 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
         // Guardamos la instancia del writer que utilizamos para guardar los datos
         bufferedWriter = bufferedWriterCSV
 
-        // Guardamos los datos en el archivo
-        bufferedWriterCSV.guardar()
+        if (bufferedWriterCSV != null){
 
-        // Limpiamos los datos del dataframe
-        dataframe.clear()
+            var deferred: CompletableDeferred<Unit>? = null
+
+            // Guardamos los datos en el archivo
+            bufferedWriterCSV.guardarAsync(object : GuardadoAsyncListener.onGuardadoAsyncListener {
+                override fun onGuardadoComenzado(completable: CompletableDeferred<Unit>) {
+                    deferred = completable
+                }
+                override fun onGuardadoCompletado() {}
+                override fun onGuardadoError(error: Throwable) {}
+            })
+
+            // Limpiamos los datos del dataframe
+            dataframe.clear()
+
+            return deferred
+        }
+
+        return null
     }
 
 

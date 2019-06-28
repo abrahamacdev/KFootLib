@@ -1,7 +1,6 @@
 package lib.Common.Controlador.Item
 
-import KFoot.Constantes
-import KFoot.Utils
+import KFoot.*
 import com.andreapivetta.kolor.Color
 import java.io.File
 import java.time.LocalDateTime
@@ -24,8 +23,8 @@ class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = 
         // Comprobamos que la ruta de guardado de los archivos sea válida
         if (rutaGuardadoArchivos != null){
             if (!rutaDeGuardadoValida(rutaGuardadoArchivos!!)){
-                Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"La ruta proporcionada para el almacenamiento de los inmuebles no es válida. " +
-                        "Se usará $rutaGuardadoArchivos", Color.RED)
+                Logger.getLogger().debug(DEBUG.DEBUG_SIMPLE,"La ruta proporcionada para el almacenamiento de los inmuebles no es válida. " +
+                        "Se usará $rutaGuardadoArchivos", IMPORTANCIA.ALTA)
             }
         }
 
@@ -58,8 +57,8 @@ class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = 
 
         // Mostramos un mensaje de error
         else {
-            Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE,"La ruta proporcionada para el almacenamiento de los inmuebles no es válida. " +
-                    "Se usará $rutaGuardadoArchivos", Color.RED)
+            Logger.getLogger().debug(DEBUG.DEBUG_SIMPLE,"La ruta proporcionada para el almacenamiento de los inmuebles no es válida. " +
+                    "Se usará $rutaGuardadoArchivos", IMPORTANCIA.ALTA)
         }
     }
 
@@ -77,7 +76,7 @@ class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = 
 
         // Mostramos un mensaje de error
         else {
-            Utils.debug(Constantes.DEBUG.DEBUG_SIMPLE, "El nombre del archivo en el que se guardarán los inmuebles no es válido", Color.RED)
+            Logger.getLogger().debug(DEBUG.DEBUG_SIMPLE, "El nombre del archivo en el que se guardarán los inmuebles no es válido", IMPORTANCIA.ALTA)
         }
     }
 
