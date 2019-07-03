@@ -26,16 +26,16 @@ class BufferedWriterCSVTest {
 
         @JvmStatic
         @AfterAll
-        fun finalizar(){
-
+        fun tearsDown(){
             val f = File(rutaArchivoPrueba)
+            println(f.exists())
             f.delete()
             println("Test Terminado")
         }
 
         @JvmStatic
         @BeforeAll
-        fun init(){
+        fun beforeUp(){
             KFoot.Logger.getLogger().setDebugLevel(KFoot.DEBUG.DEBUG_TEST)
         }
 
@@ -175,15 +175,27 @@ class BufferedWriterCSVTest {
                 .build()
 
         if (bufferedWriterCSV != null){
-            GlobalScope.launch {
-                bufferedWriterCSV.guardar()
-            }
+
+            var deferred: CompletableDeferred<Unit>? = null
+
+            bufferedWriterCSV.guardarAsync(object : GuardadoAsyncListener.onGuardadoAsyncListener {
+                override fun onGuardadoComenzado(completable: CompletableDeferred<Unit>) {
+                    deferred = completable
+                }
+                override fun onGuardadoCompletado() {
+                    println("Guardado completado")
+                }
+                override fun onGuardadoError(error: Throwable) {}
+            })
 
             runBlocking {
                 delay(2000)
                 bufferedWriterCSV.pausarGuardado()
+                println("Pausamos el guardado durante 2 segundos...")
                 delay(2000)
                 bufferedWriterCSV.reanudarGuardado()
+                println("Retomamos el guardado")
+                deferred!!.await()
             }
 
             var bufferedReader = BufferedReader(FileReader(File(rutaArchivoPrueba)))
@@ -191,6 +203,8 @@ class BufferedWriterCSVTest {
             bufferedReader.lines().forEach {
                 totalLineas++
             }
+
+            bufferedReader.close()
 
             Assertions.assertEquals(totalLineas,totalLineas)
         }

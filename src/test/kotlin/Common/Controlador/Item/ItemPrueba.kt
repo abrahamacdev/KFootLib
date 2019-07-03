@@ -2,15 +2,19 @@ package Common.Controlador.Item
 
 import lib.Common.Controlador.Item.Item
 
-class ItemPrueba: Item {
+open class ItemPrueba: Item {
 
-    private var tipo = ""
-    private var calle = ""
+    var tipo = "Desconocido"
+    var calle = "Desconocida"
 
     constructor()
 
     constructor(tipo: String, calle: String){
         this.tipo = tipo
         this.calle = calle
+    }
+
+    override fun toString(): String {
+        return "(ItemPrueba) Tipo: $tipo, Calle: $calle"
     }
 }

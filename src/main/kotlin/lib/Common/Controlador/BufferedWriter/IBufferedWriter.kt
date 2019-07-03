@@ -24,5 +24,4 @@ interface IBufferedWriter {
      * los dataos
      */
     fun guardar()
-
 }

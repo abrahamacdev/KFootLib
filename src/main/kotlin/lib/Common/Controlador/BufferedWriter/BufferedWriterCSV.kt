@@ -12,7 +12,7 @@ import java.io.*
 import java.nio.charset.StandardCharsets
 import kotlin.coroutines.*
 
-class BufferedWriterCSV: IBufferedWriter {
+class BufferedWriterCSV: IBufferedWriterAsync {
 
     // Ruta del archivo en el que se guardará la información
     private var archivo: File? = null
@@ -36,6 +36,10 @@ class BufferedWriterCSV: IBufferedWriter {
 
     // Interfaz asociada al guardado asíncrono
     var guardadoAsyncListener: GuardadoAsyncListener.onGuardadoAsyncListener? = null
+
+    // Nos servirá para reaundar el guardado de los datos en caso de pausa
+    @Volatile
+    var continuacion: Continuation<Unit>? = null
 
     @Volatile
     private var guardando = false
@@ -145,10 +149,11 @@ class BufferedWriterCSV: IBufferedWriter {
 
                 // Comprobamos si existe el archivo para escribir las cabeceras o no
                 if (escribirSiNoExiste){
-                    if (Utils.existeArchivo(this.rutaArchivo!!.canonicalPath)){
+                    if (!Utils.existeArchivo(this.rutaArchivo!!.canonicalPath)){
                         this.escribirCabeceras = true
                     }
                 }
+
                 return BufferedWriterCSV(this.fuenteDatos, this.rutaArchivo, this.escribirCabeceras, this.separador)
             }
             return null
@@ -180,7 +185,7 @@ class BufferedWriterCSV: IBufferedWriter {
      *
      * @param guardadoAsyncListener: Listener por el que comunicaremos el comienzo,finalización y errores del guardado
      */
-    fun guardarAsync(guardadoAsyncListener: GuardadoAsyncListener.onGuardadoAsyncListener) {
+    override fun guardarAsync(guardadoAsyncListener: GuardadoAsyncListener.onGuardadoAsyncListener?) {
 
         // Comprobamos si supera todas las comprobaciones previas al guardado
         if (superaComprobacionesPrevias()){
@@ -195,17 +200,35 @@ class BufferedWriterCSV: IBufferedWriter {
             job = Job()
             scope = CoroutineScope(Dispatchers.IO + job!!)
 
-            // Guardamos la referencia del listener
-            this.guardadoAsyncListener = guardadoAsyncListener
-
             // Comenzamos el guardado de forma asíncrona
             scope!!.launch {
                 guardar(scope!!.coroutineContext)
             }
 
-            // Avisamos de que el guardado a comenzado y pasamos el deferred asociado
-            guardadoAsyncListener.onGuardadoComenzado(completableDeferred!!)
+            // Comprobamos si se ha pasado una interfaz por parámetros
+            if(guardadoAsyncListener != null){
+
+                // Guardamos la referencia del listener
+                this.guardadoAsyncListener = guardadoAsyncListener
+
+                // Avisamos de que el guardado a comenzado y pasamos el deferred asociado
+                guardadoAsyncListener.onGuardadoComenzado(completableDeferred!!)
+            }
         }
+    }
+
+    /**
+     * Guardamos los datos almacenados en la [fuenteDatos]
+     * en el archivo con ruta [archivo] de forma asíncrona
+     *
+     * @param guardadoComenzado: Funcion que se llamará una vez comience el guardado
+     * @param guardadoError: Funcion que se llamará cuando ocurra algún error
+     * @param guardadoCompletado: Funcion que se llamará una cuando termine de realizarse el guardado
+     */
+    override fun guardarAsync(guardadoComenzado: (CompletableDeferred<Unit>) -> Unit,
+                              guardadoError: (Throwable) -> Unit,
+                              guardadoCompletado: () -> Unit){
+        super.guardarAsync(guardadoComenzado, guardadoError, guardadoCompletado)
     }
 
     /**
@@ -221,9 +244,7 @@ class BufferedWriterCSV: IBufferedWriter {
 
         // Escribimos en el archivo
         if (coroutineContext != null){
-            withContext(coroutineContext){
-                escribir()
-            }
+            escribir(coroutineContext)
         }
     }
 
@@ -232,8 +253,10 @@ class BufferedWriterCSV: IBufferedWriter {
     /**
      * Escribimos toda la informacion de la [fuenteDatos] en
      * el archivo CSV con ruta [archivo]
+     *
+     * @param contexto: Contexto bajo el que se ejecutará el guardado
      */
-    private fun escribir(){
+    private suspend fun escribir(contexto: CoroutineContext) = withContext(contexto){
 
         // Comprobamos que haya una fuente de datos y un buffer
         if (fuenteDatos != null && bufferedWriter != null){
@@ -255,7 +278,7 @@ class BufferedWriterCSV: IBufferedWriter {
             }
 
             // Comprobamos que el guardado no se halla cancelado|pausado y haya filas por escribir
-            while (!cancelado && !pausado && fuenteDatos!!.hayMasFilas()){
+            while (!cancelado && fuenteDatos!!.hayMasFilas()){
 
                 // TODO
                 guardados++
@@ -274,6 +297,13 @@ class BufferedWriterCSV: IBufferedWriter {
 
                 // Hacemos efectivos los cambios
                 bufferedWriter!!.flush()
+
+                // Obtenemos la continuacion de la coroutina
+                if(pausado){
+                    suspendCoroutine<Unit> {
+                        continuacion = it
+                    }
+                }
             }
 
             // Terminamos el guardado de los datos
@@ -294,8 +324,12 @@ class BufferedWriterCSV: IBufferedWriter {
         // Deshabilitamos el pausado
         pausado = false
 
+        if (continuacion != null){
+            continuacion!!.resume(Unit)
+        }
+
         // Guardado asíncrono
-        if (scope != null){
+        /*if (scope != null){
 
             scope!!.launch {
                 guardar(coroutineContext)
@@ -307,15 +341,20 @@ class BufferedWriterCSV: IBufferedWriter {
             runBlocking {
                 guardar(coroutineContext)
             }
-        }
+        }*/
     }
 
     override fun cancelarGuardado() {
         cancelado = true
     }
 
-
-    
+    override fun esperarHastaFinalizacion() {
+        if(completableDeferred != null){
+            runBlocking {
+                completableDeferred!!.await()
+            }
+        }
+    }
 
     /**
      * Realizamos una serie de comprobaciones antes de comenzar
@@ -354,6 +393,10 @@ class BufferedWriterCSV: IBufferedWriter {
             bufferedWriter = null
         }
 
+        // Eliminamos la referencia a la continuación
+        // de la coroutina
+        continuacion = null
+
         // Comprobamos si el guardado estaba siendo asíncrono
         if(scope != null){
 
@@ -368,8 +411,10 @@ class BufferedWriterCSV: IBufferedWriter {
             scope = null
             completableDeferred = null
 
-            // Eliminamos la interfaz
+            // Emitimos la finalización del guardado a través
+            // de la interfaz
             if (guardadoAsyncListener != null){
+                guardadoAsyncListener!!.onGuardadoCompletado()
                 guardadoAsyncListener = null
             }
         }

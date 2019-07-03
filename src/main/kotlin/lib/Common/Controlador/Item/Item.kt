@@ -7,6 +7,12 @@ import kotlin.collections.ArrayList
  * Esta clase servirá como base para la elaboración de
  * items más elaborados. Nos ayudará a crear una abstracción
  * común con la que guardar datos
+ *
+ * * Un punto muy importante a tener en cuenta es que todos los atributos de las clases
+ * hijas deben de contener única y exclusivamente valores que se almacenarán, es decir,
+ * no pueden tener atributos de lógica de la clase puesto que estos se acabarán almacenando
+ *
+ * ** Otro punto importante es que todos los Items tienen que tener un constructor vacío
  */
 abstract class Item {
 

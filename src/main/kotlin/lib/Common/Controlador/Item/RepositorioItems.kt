@@ -10,25 +10,29 @@ import io.reactivex.subjects.PublishSubject
 import lib.Common.Controlador.BufferedWriter.BufferedWriterCSV
 import lib.Common.Controlador.BufferedWriter.GuardadoAsyncListener
 import lib.Common.Controlador.BufferedWriter.IBufferedWriter
+import lib.Common.Controlador.BufferedWriter.IBufferedWriterAsync
 import lib.Common.Modelo.FuenteDatos
+import lib.Common.Utiles.ColumnsUtils
 import kotlin.coroutines.CoroutineContext
 
-class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null, val configuracion: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()){
+class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, val configuracion: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()){
 
     // --- Tipo de dato del Repositorio ---
-    private var instanciaTipoActual: Item = clazz.newInstance()      // Nos servirá más adelante para obtener la información de los items que se creen
-    private var tipoActual: Class<*> = clazz                         // Tipo de dato que almacena el repositorio
+    private var instanciaTipoActual: Item? = null                        // Nos servirá más adelante para obtener la información de los items que se creen
+    private var tipoActual: Class<Item> = clazz                          // Tipo de dato que almacena el repositorio
     // -----
 
     // --- Referente al Dataframe ---
-    private lateinit var dataframe: Table                           // Dataframe con los datos
-    private lateinit var nomCols: List<String>                      // Nombre de las columnas que almacena el dataframe
+    private lateinit var dataframe: Table                               // Dataframe con los datos
+    private lateinit var nomCols: List<String>                          // Nombre de las columnas que almacena el dataframe
     // -----
 
     // --- Lógica de la clase ---
-    private var seHaCambiadoTipo = false                            // Permitira la modificacion de las columnas del dataframe en su estado inicial
-    private var fuenteDatos: FuenteDatos = FuenteDatos()            // Fuente de datos que proporcionaremos al writer
-    private var bufferedWriter: IBufferedWriter? = null             // Buffered writer
+    private var seHaCambiadoTipo = false                                // Permitira la modificacion de las columnas del dataframe en su estado inicial
+    private var fuenteDatos: FuenteDatos = FuenteDatos()                // Fuente de datos que proporcionaremos al writer
+    private var bufferedWriter: IBufferedWriterAsync? = null            // Buffered writer
+    private var completableDeferred: CompletableDeferred<Unit>? = null  // Completable vinculado al guardado asíncrono
+    private var permitirGuardado: Boolean = true                        // Permitirá que se guarden los datos
     // -----
 
     companion object {
@@ -38,11 +42,20 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
          *
          * @return {[ConjuntoInmuebleFactory]}
          */
-        inline fun <reified T: Item> create(listaInmueble: List<T>? = null, propiedades: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()): RepositorioItems<T> =
-                RepositorioItems<T>(T::class.java, listaInmueble, propiedades)
+        inline fun <reified T: Item> create(listaInmueble: List<T>? = null, propiedades: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()): RepositorioItems{
+            return RepositorioItems(T::class.java as Class<Item>, listaInmueble, propiedades)
+        }
     }
 
     init {
+
+        // No podemos crear un repositorio de items básicos
+        if(clazz == Item::class.java){
+            throw InstantiationError("No se puede crear un Repositorio de Items básicos")
+        }
+
+        // Creamos una instancia de la clase obtenida en el constructor
+        instanciaTipoActual= clazz.newInstance()
 
         // Creamos el dataframe y añadimos los inmuebles
         crearDataFrame(listaInmuebles)
@@ -56,17 +69,17 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      *
      * @param listaInmuebles: Lista de inmuebles que añadiremos al dataframe
      */
-    private fun crearDataFrame(listaInmuebles: List<T>? = null){
+    private fun crearDataFrame(listaInmuebles: List<Item>? = null){
 
         // Creamos el dataframe
         dataframe = Table.create()
 
         // Añadimos las columnas al dataframe
-        anadirColsDataframe(dataframe, instanciaTipoActual)
+        anadirColsDataframe(dataframe, instanciaTipoActual!!)
 
         // Establecemos los nombres de las columnas según los nombres de los atributos
         // del tipo actual
-        this.nomCols = instanciaTipoActual.obtenerNombreAtributos()
+        this.nomCols = instanciaTipoActual!!.obtenerNombreAtributos()
 
         // Añadimos la lista de inmueble al dataframe
         anadirListaItems(listaInmuebles)
@@ -80,43 +93,31 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      *
      * @param item: Item a añadir al dataframe
      */
-    fun anadirItem(item: T){
+    fun anadirItem(item: Item){
 
         // Comprobamos que el item recibido por parametro sea diferente al ya establecido
-        if (!item.javaClass.canonicalName.equals(tipoActual.canonicalName)){
+        if (item.javaClass != tipoActual){
 
-            // Comprobamos si ya hemos cambiado el tipo de dato del item
-            if (!seHaCambiadoTipo){
+            // Cambiamos los campos del dataframe
+            cambiarTipoDataFrameActual(item)
+        }
 
-                cambiarTipoDataFrameActual(item)
-            }
+        // Comprobamos que el item sea del mismo tipo
+        // que el que se almacena actualmente
+        if (item.javaClass == tipoActual){
 
-            // El item recibido es diferente al actual y ya hemos modificado el tipo de dato almacenado
-            else {
-                Logger.getLogger().debug(KFoot.DEBUG.DEBUG_SIMPLE, "El tipo de item almacenado en el repositorio ya ha sido modificado. El item no se guardara.", IMPORTANCIA.ALTA)
-                return
+            // Recorremos cada atributo del item
+            nomCols.forEach { atributo ->
+
+                val valor = item.obtenerValorDe(atributo,item)
+
+                // Evitamos setear valores extraños al dataframe
+                if (valor != null){
+                    dataframe.column(atributo).appendCell(valor)
+                }
             }
         }
 
-        // Fila que pasaremos a la fuente de datos
-        val fila: HashMap<String, Any?> = HashMap()
-
-        // Recorremos cada atributo del item
-        nomCols.forEach { atributo ->
-
-            val valor = item.obtenerValorDe(atributo,item)
-
-            // Evitamos setear valores extraños al dataframe
-            if (valor != null){
-                dataframe.column(atributo).appendCell(valor)
-
-                // Guardamos el valor en la fila
-                fila.put(atributo,valor)
-            }
-        }
-
-        // Añadimos los datos a la fuente de datos
-        fuenteDatos.anadirDatosFila(fila)
     }
 
     /**
@@ -125,7 +126,7 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      *
      * @param listaItems: Lista con los items a añadir
      */
-    fun anadirListaItems(listaItems: List<T>?){
+    fun anadirListaItems(listaItems: List<Item>?){
 
         // Añadimos los datos al dataframe
         if (listaItems != null) {
@@ -147,62 +148,79 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      * Guardamos los datos del dataframe según la configuracion
      * pasada en el constructor
      * @see [configuracion]
-     *
-     *  @return PublishSubject<Nothing>?: que nos permitira saber cuando se ha completado el guardado
      */
-    fun guardar(): CompletableDeferred<Unit>? {
+    fun guardarAsync() {
 
-        var completableDeferred: CompletableDeferred<Unit>? = null
+        if (permitirGuardado){
 
-        when {
-            // Se guardará en un archivo CSV
-            configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv -> {
-                completableDeferred = guardarCSV()
+            when {
+                // Se guardará en un archivo CSV
+                configuracion.getExtensionArchivo() == Constantes.EXTENSIONES_ARCHIVOS.csv -> {
+                    guardarCSV()
+                }
             }
         }
-        return completableDeferred
     }
 
     /**
-     * Realizaremos el guardado de los datos en un archivo CSV
-     * de forma asíncrona
-     *
-     * @return CompletableDeferred<Unit>?: Deferred con el que podremos esperar a la finalización del guardado
+     * Guardamos los datos del dataframe en el archivo
+     * CSV proporcionado en la [configuracion]
      */
-    private fun guardarCSV(): CompletableDeferred<Unit>?{
+    private fun guardarCSV(){
 
-        val bufferedWriterCSV = BufferedWriterCSV.Builder()
-                .escribirCabecerasSiNoExisteArchivo()
-                .guardarEn(configuracion.getRutaGuardadoArchivos() + "/${configuracion.getNombreArchivo()}.${configuracion.getExtensionArchivo().name}")
-                .obtenerDatosDe(fuenteDatos)
-                .build()
+        // Si ya hay un guardado en curso evitamos hacer otro
+        if (bufferedWriter == null && completableDeferred == null){
 
-        // Guardamos la instancia del writer que utilizamos para guardar los datos
-        bufferedWriter = bufferedWriterCSV
+            //Creamos nuestra fuente de datos
+            fuenteDatos = FuenteDatos(dataframe)
 
-        if (bufferedWriterCSV != null){
+            // Creamos el writer
+            bufferedWriter = BufferedWriterCSV.Builder()
+                    .escribirCabecerasSiNoExisteArchivo()
+                    .guardarEn("${configuracion.getRutaGuardadoArchivos()}/${configuracion.getNombreArchivo()}.${configuracion.getExtensionArchivo()}")
+                    .obtenerDatosDe(fuenteDatos)
+                    .build()
 
-            var deferred: CompletableDeferred<Unit>? = null
+            // Comprobamos que se haya podrido crear el writer
+            if (bufferedWriter != null){
 
-            // Guardamos los datos en el archivo
-            bufferedWriterCSV.guardarAsync(object : GuardadoAsyncListener.onGuardadoAsyncListener {
-                override fun onGuardadoComenzado(completable: CompletableDeferred<Unit>) {
-                    deferred = completable
-                }
-                override fun onGuardadoCompletado() {}
-                override fun onGuardadoError(error: Throwable) {}
-            })
+                // Comenzamos el guardado de forma asíncrona
+                bufferedWriter!!.guardarAsync({
+                    it -> completableDeferred = it
+                },{},{
+                    bufferedWriter = null
+                    completableDeferred = null
+                })
+            }
 
-            // Limpiamos los datos del dataframe
-            dataframe.clear()
-
-            return deferred
+            else{
+                Logger.getLogger().debug(KFoot.DEBUG.DEBUG_TEST,"No se ha podido crear el BufferedWriterCSV, comprueba que se pasen los parámetros necesarios al constructor",IMPORTANCIA.ALTA)
+            }
         }
-
-        return null
     }
 
 
+
+    /**
+     * Añadimos al dataframe nuevas columnas a partir
+     * del ([item]) pasado por parámetros
+     *
+     * @param df: Tabla a la que se le asignaran las columnas
+     * @param item: Item del que estraeremos las columnas a establecer en [df]
+     */
+    private fun anadirColsDataframe(df: Table, item: Item){
+
+        val listaAtributos = item.obtenerNombreTipoAtributos()
+
+        with(df){
+            addColumns(
+                    //Hacemos uso del operador "spread" (*), que nos permite pasar un Array a un vararg
+                    *listaAtributos.map {
+                        ColumnsUtils.castearAColumna(it.first,it.second)!!
+                    }.toTypedArray()
+            )
+        }
+    }
 
     /**
      * Cambiamos el tipo de dato que se almacena en el dataframe
@@ -237,40 +255,32 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
                 this.instanciaTipoActual = nuevoItem
 
                 // Guardamos los viejos nombres de columnas
-                val viejosNomCols = nomCols
+                val viejosNomCols = this.nomCols
 
                 // Establecemos los nuevos nombres de las columnas
                 this.nomCols = nuevoItem.obtenerNombreAtributos()
 
                 // Volvemos a comprobar si podemos guardar los datos
-                /*if (colsDataframesCoinciden(nomCols,viejosNomCols)){
+                if (nuevsCabsContienenViejsCabs(nomCols,viejosNomCols)){
                     permitirGuardado = true
-                }*/
+                }
+
+                // Las nuevas columnas no coinciden con las del antiguo dataframe
+                else {
+                    permitirGuardado = false
+                }
 
                 // Ya no podremos cambiar más el tipo de dato de este dataframe
                 this.seHaCambiadoTipo = true
+
+                Logger.getLogger().debug(KFoot.DEBUG.DEBUG_TEST, "Se ha cambiado el tipo de dato almacenado en el dataframe correctamente", IMPORTANCIA.BAJA)
             }
         }
-    }
 
-    /**
-     * Añadimos al dataframe las columnas y sus respectivos tipos
-     * a partir de los atributos del tipo de dato que se almacena
-     *
-     * @param df: Tabla a la que se le asignaran las columnas
-     * @param item: Item del que estraeremos las columnas a establecer en [df]
-     */
-    private fun anadirColsDataframe(df: Table, item: Item){
-
-        val listaAtributos = item.obtenerNombreTipoAtributos()
-
-        with(df){
-            addColumns(
-                    //Hacemos uso del operador "spread" (*), que nos permite pasar un Array a un vararg
-                    *listaAtributos.map {
-                        Utils.castearAColumna(it.first,it.second)!!
-                    }.toTypedArray()
-            )
+        // El item recibido es diferente al actual y ya hemos modificado el tipo de dato almacenado
+        else {
+            Logger.getLogger().debug(KFoot.DEBUG.DEBUG_SIMPLE, "El tipo de item almacenado en el repositorio ya ha sido modificado. El item no se guardara.", IMPORTANCIA.ALTA)
+            return
         }
     }
 
@@ -283,10 +293,6 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      * @param viejoDataframe: VIejo dataframe
      */
     private fun colsDataframesCoinciden(nuevoDataframe: Table, viejoDataframe: Table): Boolean{
-
-        println(nuevoDataframe)
-        println(nuevoDataframe.columnCount())
-        println(nomCols.size)
 
         // Comprobamos primero que la cuenta de columnas coincidan
         if (nuevoDataframe.columnCount() == nomCols.size){
@@ -303,7 +309,8 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
                 !cabecerasViejoDataframe.contains(it)
             }
 
-            // Estan todas las cols
+            // Comprobamos si hay algún valor en
+            // la variable #noCoincide
             if (noCoincide == null){
                 return true
             }
@@ -312,22 +319,21 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
     }
 
     /**
-     * Comprobamos que las columnas de los dataframes pasados por parametro
-     * coincidan
-     * *Solo comprueba que los nombres de las columnas coincidan
+     * Comprobamos que la lista de las nuevas cabeceras del dataframe contenga
+     * todas las cabeceras antiguas
      *
      * @param nuevasCabeceras: Nuevas cabeceras
      * @param viejasCabeceras: VIejos cabeceras
      */
-    private fun colsDataframesCoinciden(nuevasCabeceras: List<String>, viejasCabeceras: List<String>): Boolean{
+    private fun nuevsCabsContienenViejsCabs(nuevasCabeceras: List<String>, viejasCabeceras: List<String>): Boolean{
 
         // Comprobamos primero que la cuenta de columnas coincidan
-        if (nuevasCabeceras.size == viejasCabeceras.size){
+        if (nuevasCabeceras.size >= viejasCabeceras.size){
 
             // Comprobamos si todas las cols del archivo tienen los mismos
             // nombres que las cols del dataframe actual
-            val noCoincide = nuevasCabeceras.firstOrNull {
-                !viejasCabeceras.contains(it)
+            val noCoincide = viejasCabeceras.firstOrNull {
+                !nuevasCabeceras.contains(it)
             }
 
             // Estan todas las cols
@@ -364,7 +370,6 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
                 // Establecemos los valores a la nueva instancia
                 nuevaInstancia.establecerValor(nomCol,valor,nuevaInstancia)
             }
-
 
             // Añadimos los valores al nuevo dataframe
             nuevoDataframe.columns().forEach{ col ->
@@ -422,6 +427,24 @@ class RepositorioItems<T: Item>(clazz: Class<T>, listaInmuebles: List<T>? = null
      * @param Boolean si aún quedan datos
      */
     fun todoGuardado(): Boolean{
-        return dataframe.count() == 0
+        return dataframe.count() == 0 && completableDeferred != null && completableDeferred!!.isCompleted
+    }
+
+    /**
+     * Esperamos hasta la finalización del guardado asíncrono
+     * si existe uno en curso
+     */
+    fun esperarFinalizacionGuardado(){
+        if (bufferedWriter != null){
+            bufferedWriter!!.esperarHastaFinalizacion()
+        }
+    }
+
+    fun getTipoActual(): Class<Item> {
+        return tipoActual
+    }
+
+    fun getCount():Int {
+        return dataframe.count()
     }
 }

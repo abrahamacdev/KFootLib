@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * {[nombreArchivo]} ->         Nombre que tendra el archivo. Por defecto se le asignará uno si el valor de este es "null"
  * {[extensionArchivo]} ->             Extensión que usará el archivo. Por defecto será "csv"
  */
-class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = KFoot.Utils.obtenerDirDocumentos(),
+data class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: String? = KFoot.Utils.obtenerDirDocumentos(),
                                     private var nombreArchivo: String? = null, private var extensionArchivo: Constantes.EXTENSIONES_ARCHIVOS = Constantes.EXTENSIONES_ARCHIVOS.csv) {
 
     init {

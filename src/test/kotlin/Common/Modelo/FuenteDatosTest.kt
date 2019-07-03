@@ -1,13 +1,33 @@
 package Common.Modelo
 
+import Common.Controlador.Item.ItemPrueba
+import Common.Controlador.Item.ItemPruebaDos
 import lib.Common.Modelo.FuenteDatos
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import tech.tablesaw.api.IntColumn
 import tech.tablesaw.api.StringColumn
 import tech.tablesaw.api.Table
+import java.util.*
 
 class FuenteDatosTest {
+
+    companion object {
+
+
+        @JvmStatic
+        @AfterAll
+        fun finalizar(){}
+
+        @JvmStatic
+        @BeforeAll
+        fun beforeUp(){
+            KFoot.Logger.getLogger().setDebugLevel(KFoot.DEBUG.DEBUG_TEST)
+        }
+
+    }
 
     @Test
     fun crea_fuente_de_datos_a_partir_de_una_tabla(){
@@ -59,4 +79,19 @@ class FuenteDatosTest {
         }
     }
 
+    @Test
+    fun se_agregan_items_de_forma_correcta(){
+
+        val f = FuenteDatos()
+        val item = ItemPrueba("Vivienda", "Calle Sol")
+        val item2 = ItemPruebaDos(10000,2)
+
+        // Añadimos el item
+        f.anadirItem(item)
+        f.anadirItem(item2)
+
+        while (f.hayMasFilas()){
+            println(Arrays.toString(f.siguienteFila()!!.toArray()))
+        }
+    }
 }
