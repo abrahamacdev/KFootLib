@@ -7,6 +7,7 @@ import KFoot.Utils
 import com.andreapivetta.kolor.Color
 import io.reactivex.Completable
 import kotlinx.coroutines.*
+import lib.Common.Controlador.Item.Item
 import lib.Common.Modelo.FuenteDatos
 import java.io.*
 import java.nio.charset.StandardCharsets
@@ -19,6 +20,9 @@ class BufferedWriterCSV: IBufferedWriterAsync {
 
     // Si es escribirán las cabeceras en el archivo o no
     private var escribirCabeceras: Boolean = false
+
+    // Lista de cabeceras a escribir en el archivo
+    private var listaDeCabeceras: List<String>? = null
 
     // FuenteDatos de datos
     private var fuenteDatos: FuenteDatos? = null
@@ -54,11 +58,12 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     */
     private var cabeceraEscrita = false
 
-    private constructor(fuenteDatos: FuenteDatos?, rutaArchivo: File? = null, escribirCabeceras: Boolean = false, separador: String){
+    private constructor(fuenteDatos: FuenteDatos?, rutaArchivo: File? = null, escribirCabeceras: Boolean = false, separador: String, listaCabeceras: List<String>? = null){
         this.archivo = rutaArchivo
         this.escribirCabeceras = escribirCabeceras
         this.separador = separador
         this.fuenteDatos = fuenteDatos
+        this.listaDeCabeceras = listaCabeceras
     }
 
 
@@ -69,6 +74,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
         private var escribirCabeceras: Boolean = false
         private var escribirSiNoExiste: Boolean = false
         private var fuenteDatos: FuenteDatos? = null
+        private var listaCabeceras: List<String>? = null
         private var separador = ","
 
         /**
@@ -78,6 +84,15 @@ class BufferedWriterCSV: IBufferedWriterAsync {
          */
         fun escribirCabeceras(escribir: Boolean = false): Builder {
             this.escribirCabeceras = escribir
+            return this
+        }
+
+        /**
+         * Establecemos la escritura de las cabeceras si el archivo
+         * no existe aún
+         */
+        fun escribirCabecerasSiNoExisteArchivo(): Builder{
+            escribirSiNoExiste = true
             return this
         }
 
@@ -129,11 +144,12 @@ class BufferedWriterCSV: IBufferedWriterAsync {
         }
 
         /**
-         * Establecemos la escritura de las cabeceras si el archivo
-         * no existe aún
+         * Lista con las cabeceras que se escribirán en el archivo
          */
-        fun escribirCabecerasSiNoExisteArchivo(): Builder{
-            escribirSiNoExiste = true
+        fun listaDeCabeceras(cabeceras: List<String>): Builder{
+            if (cabeceras.size > 0){
+                this.listaCabeceras = cabeceras
+            }
             return this
         }
 
@@ -154,7 +170,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
                     }
                 }
 
-                return BufferedWriterCSV(this.fuenteDatos, this.rutaArchivo, this.escribirCabeceras, this.separador)
+                return BufferedWriterCSV(this.fuenteDatos, this.rutaArchivo, this.escribirCabeceras, this.separador, this.listaCabeceras)
             }
             return null
         }
@@ -261,20 +277,16 @@ class BufferedWriterCSV: IBufferedWriterAsync {
         // Comprobamos que haya una fuente de datos y un buffer
         if (fuenteDatos != null && bufferedWriter != null){
 
-            // Escribimos las cabeceras en el archivo
-            if (escribirCabeceras && !cabeceraEscrita){
+            // Comprobamos que haya que escribir las cabeceras y estas no hayan sido ya escritas
+            if (!cabeceraEscrita && escribirCabeceras && listaDeCabeceras != null){
 
-                // Obtenemos las cabeceras de la fuente de datos
-                // y las escribimos en el archivo
-                var cabecera = ""
-                for (i in 0 until fuenteDatos!!.getCabeceras().size - 1){
-                    cabecera += fuenteDatos!!.getCabeceras().get(i) + separador
+                // Escribimos todas las cabeceras seguidas del separador
+                for (i in 0 until listaDeCabeceras!!.size - 1){
+                    bufferedWriter!!.write("${listaDeCabeceras!!.get(i)}$separador")
                 }
-                cabecera += fuenteDatos!!.getCabeceras().get(fuenteDatos!!.getCabeceras().size - 1) + "\n"
-                bufferedWriter!!.write(cabecera)
 
-                // Ya hemos escrito la cabecera
-                cabeceraEscrita = true
+                // A la última cabecera le agregamos un salto de línea
+                bufferedWriter!!.write("${listaDeCabeceras!!.get(listaDeCabeceras!!.size - 1)}\n")
             }
 
             // Comprobamos que el guardado no se halla cancelado|pausado y haya filas por escribir

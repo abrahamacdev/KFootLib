@@ -9,7 +9,7 @@ class ItemPruebaTres: ItemPrueba {
 
     constructor(localizacion: String, precio: Double){
         this.precio = precio
-        this.localicacion = localicacion
+        this.localicacion = localizacion
     }
 
     override fun toString(): String {

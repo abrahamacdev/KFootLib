@@ -172,7 +172,7 @@ class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, v
         if (bufferedWriter == null && completableDeferred == null){
 
             //Creamos nuestra fuente de datos
-            fuenteDatos = FuenteDatos(dataframe)
+            fuenteDatos = FuenteDatos()
 
             // Creamos el writer
             bufferedWriter = BufferedWriterCSV.Builder()

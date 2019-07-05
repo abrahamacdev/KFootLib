@@ -2,6 +2,7 @@ package Common.Modelo
 
 import Common.Controlador.Item.ItemPrueba
 import Common.Controlador.Item.ItemPruebaDos
+import Common.Controlador.Item.ItemPruebaTres
 import lib.Common.Modelo.FuenteDatos
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
@@ -29,7 +30,7 @@ class FuenteDatosTest {
 
     }
 
-    @Test
+    /*@Test
     fun crea_fuente_de_datos_a_partir_de_una_tabla(){
 
         val table = Table.create("Tabla")
@@ -77,21 +78,29 @@ class FuenteDatosTest {
                 i++
             }
         }
-    }
+    }*/
 
     @Test
     fun se_agregan_items_de_forma_correcta(){
 
         val f = FuenteDatos()
         val item = ItemPrueba("Vivienda", "Calle Sol")
-        val item2 = ItemPruebaDos(10000,2)
+        val item2 = ItemPrueba("Garaje","Calle Luna")
+        val item3 = ItemPruebaDos(100000,3)
+        val item4 = ItemPruebaTres("Calle Júpiter", 1000.0)
 
         // Añadimos el item
         f.anadirItem(item)
         f.anadirItem(item2)
+        f.anadirItem(item3)
+        f.anadirItem(item4)
 
+        var numItems = 0
         while (f.hayMasFilas()){
+            numItems++
             println(Arrays.toString(f.siguienteFila()!!.toArray()))
         }
+
+        assert(numItems == 4)
     }
 }
