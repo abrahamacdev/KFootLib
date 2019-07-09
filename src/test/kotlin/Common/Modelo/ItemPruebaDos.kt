@@ -1,6 +1,4 @@
-package Common.Controlador.Item
-
-import lib.Common.Controlador.Item.Item
+package Common.Modelo
 
 class ItemPruebaDos: ItemPrueba {
 

@@ -1,31 +1,44 @@
 package Common.Modelo
 
-import Common.Controlador.Item.ItemPrueba
-import Common.Controlador.Item.ItemPruebaDos
-import Common.Controlador.Item.ItemPruebaTres
-import lib.Common.Modelo.FuenteDatos
+import Common.Controlador.BufferedWriter.BufferedWriterCSVTest
+import KFoot.Utils
+import io.reactivex.Observable
+import io.reactivex.disposables.Disposable
+import lib.Common.Modelo.FuenteItems
 import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import tech.tablesaw.api.IntColumn
-import tech.tablesaw.api.StringColumn
-import tech.tablesaw.api.Table
-import java.util.*
+import java.util.concurrent.TimeUnit
 
-class FuenteDatosTest {
+class FuenteItemsTest {
 
     companion object {
 
+        val vigiliarRam = true
+        var observableRam: Observable<Long>? = null
+        var disposable: Disposable? = null
 
         @JvmStatic
         @AfterAll
-        fun finalizar(){}
+        fun finalizar(){
+
+            if (BufferedWriterCSVTest.observableRam != null && BufferedWriterCSVTest.disposable != null){
+                BufferedWriterCSVTest.disposable!!.dispose()
+            }
+
+        }
 
         @JvmStatic
         @BeforeAll
         fun beforeUp(){
             KFoot.Logger.getLogger().setDebugLevel(KFoot.DEBUG.DEBUG_TEST)
+
+            if (vigiliarRam){
+                observableRam = Observable.interval(1, TimeUnit.SECONDS)
+                disposable = observableRam!!.subscribe {
+                    println("Utilizando ${Utils.memoriaUsada()}MB de memoria RAM")
+                }
+            }
         }
 
     }
@@ -50,7 +63,7 @@ class FuenteDatosTest {
         table.column("Nombre").appendCell("Pepe")
         table.column("Nombre").appendCell("Juan")
 
-        val fuente = FuenteDatos(table)
+        val fuente = FuenteItems(table)
 
         var  i = 0
 
@@ -83,24 +96,38 @@ class FuenteDatosTest {
     @Test
     fun se_agregan_items_de_forma_correcta(){
 
-        val f = FuenteDatos()
-        val item = ItemPrueba("Vivienda", "Calle Sol")
-        val item2 = ItemPrueba("Garaje","Calle Luna")
-        val item3 = ItemPruebaDos(100000,3)
-        val item4 = ItemPruebaTres("Calle Júpiter", 1000.0)
-
-        // Añadimos el item
-        f.anadirItem(item)
-        f.anadirItem(item2)
-        f.anadirItem(item3)
-        f.anadirItem(item4)
+        val f = FuenteItems<ItemPruebaDos>(ItemPruebaDos())
 
         var numItems = 0
-        while (f.hayMasFilas()){
-            numItems++
-            println(Arrays.toString(f.siguienteFila()!!.toArray()))
+        var totalItems = 5
+
+
+        for (i in 0 until totalItems){
+
+            f.anadirItem(ItemPruebaDos(i, i))
         }
 
-        assert(numItems == 4)
+        while (f.hayMasFilas()){
+            numItems++
+            f.siguienteFila()
+            //println(Arrays.toString(f.siguienteFila()!!.toArray()))
+        }
+
+        assert(numItems == totalItems)
+    }
+
+    @Test
+    fun la_fuente_de_datos_no_supera_150_MB(){
+
+        val f = FuenteItems<ItemPruebaDos>(ItemPruebaDos())
+        val cantidad = 1000000
+        var limiteRam = 150
+
+        for (i in 0 until cantidad){
+            f.anadirItem(ItemPruebaDos(i, i))
+        }
+
+        assert(Utils.memoriaUsada() <= limiteRam, { println("La memoria utilizada superaba el límite (${Utils.memoriaUsada()}MB)") })
+        println("La memoria total necesitada para añadir $cantidad de items asciende a ${Utils.memoriaUsada()}MB")
     }
 }

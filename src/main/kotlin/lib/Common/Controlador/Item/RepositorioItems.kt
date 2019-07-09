@@ -3,19 +3,14 @@ package lib.Common.Controlador.Item
 import KFoot.Constantes
 import KFoot.IMPORTANCIA
 import KFoot.Logger
-import lib.Common.Utiles.Utils
 import kotlinx.coroutines.*
-import tech.tablesaw.api.Table
-import io.reactivex.subjects.PublishSubject
 import lib.Common.Controlador.BufferedWriter.BufferedWriterCSV
-import lib.Common.Controlador.BufferedWriter.GuardadoAsyncListener
-import lib.Common.Controlador.BufferedWriter.IBufferedWriter
+import tech.tablesaw.api.Table
 import lib.Common.Controlador.BufferedWriter.IBufferedWriterAsync
-import lib.Common.Modelo.FuenteDatos
+import lib.Common.Modelo.FuenteItems
 import lib.Common.Utiles.ColumnsUtils
-import kotlin.coroutines.CoroutineContext
 
-class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, val configuracion: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()){
+class RepositorioItems <T: Item> (clazz: Class<Item>, listaInmuebles: List<Item>? = null, val configuracion: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()){
 
     // --- Tipo de dato del Repositorio ---
     private var instanciaTipoActual: Item? = null                        // Nos servirá más adelante para obtener la información de los items que se creen
@@ -29,10 +24,11 @@ class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, v
 
     // --- Lógica de la clase ---
     private var seHaCambiadoTipo = false                                // Permitira la modificacion de las columnas del dataframe en su estado inicial
-    private var fuenteDatos: FuenteDatos = FuenteDatos()                // Fuente de datos que proporcionaremos al writer
+    private var fuenteItems: FuenteItems<Item>? = null                  // Fuente de datos que proporcionaremos al writer
     private var bufferedWriter: IBufferedWriterAsync? = null            // Buffered writer
     private var completableDeferred: CompletableDeferred<Unit>? = null  // Completable vinculado al guardado asíncrono
     private var permitirGuardado: Boolean = true                        // Permitirá que se guarden los datos
+    private var ultFilaAnadida = 0                                     // Nos servirá para no guardar datos que ya fueron guardados
     // -----
 
     companion object {
@@ -42,8 +38,8 @@ class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, v
          *
          * @return {[ConjuntoInmuebleFactory]}
          */
-        inline fun <reified T: Item> create(listaInmueble: List<T>? = null, propiedades: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()): RepositorioItems{
-            return RepositorioItems(T::class.java as Class<Item>, listaInmueble, propiedades)
+        inline fun <reified T: Item> create(listaInmueble: List<T>? = null, propiedades: ConfiguracionRepositorioItems = ConfiguracionRepositorioItems()): RepositorioItems<T>{
+            return RepositorioItems<T>(T::class.java as Class<Item>, listaInmueble, propiedades)
         }
     }
 
@@ -172,13 +168,16 @@ class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, v
         if (bufferedWriter == null && completableDeferred == null){
 
             //Creamos nuestra fuente de datos
-            fuenteDatos = FuenteDatos()
+            fuenteItems = FuenteItems<Item>(instanciaTipoActual!!)
+
+            // Añadimos los datos del dataframe a la fuente de items
+            anadirDatosAFuenteItems(fuenteItems!!)
 
             // Creamos el writer
             bufferedWriter = BufferedWriterCSV.Builder()
                     .escribirCabecerasSiNoExisteArchivo()
                     .guardarEn("${configuracion.getRutaGuardadoArchivos()}/${configuracion.getNombreArchivo()}.${configuracion.getExtensionArchivo()}")
-                    .obtenerDatosDe(fuenteDatos)
+                    .obtenerDatosDe(fuenteItems!!)
                     .build()
 
             // Comprobamos que se haya podrido crear el writer
@@ -188,8 +187,12 @@ class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, v
                 bufferedWriter!!.guardarAsync({
                     it -> completableDeferred = it
                 },{},{
+
+                    // Cuando se haya completado el guardado eliminamos todos los objetos
+                    // necesitados
                     bufferedWriter = null
                     completableDeferred = null
+                    fuenteItems = null
                 })
             }
 
@@ -380,6 +383,28 @@ class RepositorioItems(clazz: Class<Item>, listaInmuebles: List<Item>? = null, v
                 // Añadimos el valor al nuevo dataframe
                 nuevoDataframe.column(col.name()).appendCell(valor)
             }
+        }
+    }
+
+    /**
+     * Copiamos los datos del dataframe actual
+     * a la fuente de items recibida por parámetros
+     *
+     * @param fuenteItems: Fuente de items a la que le pasaremos los datos
+     */
+    private fun anadirDatosAFuenteItems(fuenteItems: FuenteItems<Item>){
+
+        // Recorremos las filas que no fueron guardadas
+        for (i in ultFilaAnadida until dataframe.count()){
+
+            // Creamos un item y le seteamos los valores a todos sus atributos
+            val cabeceras = dataframe.columnNames()
+            val item = tipoActual.newInstance()
+            cabeceras.forEach {cabecera ->
+                item.establecerValor(cabecera, dataframe.column(cabecera).get(i), item)
+            }
+
+            fuenteItems.anadirItem(item)
         }
     }
 

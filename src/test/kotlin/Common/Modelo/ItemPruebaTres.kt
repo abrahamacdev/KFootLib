@@ -1,4 +1,4 @@
-package Common.Controlador.Item
+package Common.Modelo
 
 class ItemPruebaTres: ItemPrueba {
 

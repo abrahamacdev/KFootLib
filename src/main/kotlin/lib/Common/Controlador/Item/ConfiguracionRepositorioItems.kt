@@ -143,23 +143,6 @@ data class ConfiguracionRepositorioItems(private var rutaGuardadoArchivos: Strin
     }
 
     /**
-     * Comprobamos si los intervalos que se setearán para el guardado automático son
-     * válidos
-     *
-     * @param intervalos: Cantidada de tiempo entre ticks
-     * @param unidadTiempo: Unidad de tiempo que se utilizará para emitir los ticks
-     *
-     * @return Boolean: Si los intervalos a setear son válidos
-     */
-    private fun intervalosGuardadoAutValidos(intervalos: Long, unidadTiempo: TimeUnit): Boolean{
-        if ((intervalos < 3000000000 && unidadTiempo == TimeUnit.NANOSECONDS) || (intervalos < 3000 && unidadTiempo == TimeUnit.MILLISECONDS) || (intervalos < 3 && unidadTiempo == TimeUnit.SECONDS)){
-            return false
-        }
-
-        return true
-    }
-
-    /**
      * Comprobamos que la ruta en la que se guardará el archivo es válida
      *
      * @param rutaGuardadoArchivos: Ruta en la que se guardarán los archivos

@@ -1,14 +1,11 @@
 package lib.Common.Controlador.BufferedWriter
 
-import KFoot.Constantes
 import KFoot.IMPORTANCIA
 import KFoot.Logger
 import KFoot.Utils
-import com.andreapivetta.kolor.Color
-import io.reactivex.Completable
 import kotlinx.coroutines.*
 import lib.Common.Controlador.Item.Item
-import lib.Common.Modelo.FuenteDatos
+import lib.Common.Modelo.FuenteItems
 import java.io.*
 import java.nio.charset.StandardCharsets
 import kotlin.coroutines.*
@@ -24,8 +21,8 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     // Lista de cabeceras a escribir en el archivo
     private var listaDeCabeceras: List<String>? = null
 
-    // FuenteDatos de datos
-    private var fuenteDatos: FuenteDatos? = null
+    // FuenteItems de datos
+    private var fuenteItems: FuenteItems<Item>? = null
 
     // Writer del archivo
     private var bufferedWriter: BufferedWriter? = null
@@ -58,11 +55,11 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     */
     private var cabeceraEscrita = false
 
-    private constructor(fuenteDatos: FuenteDatos?, rutaArchivo: File? = null, escribirCabeceras: Boolean = false, separador: String, listaCabeceras: List<String>? = null){
+    private constructor(fuenteItems: FuenteItems<Item>?, rutaArchivo: File? = null, escribirCabeceras: Boolean = false, separador: String, listaCabeceras: List<String>? = null){
         this.archivo = rutaArchivo
         this.escribirCabeceras = escribirCabeceras
         this.separador = separador
-        this.fuenteDatos = fuenteDatos
+        this.fuenteItems = fuenteItems
         this.listaDeCabeceras = listaCabeceras
     }
 
@@ -73,7 +70,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
         private var rutaArchivo: File? = null
         private var escribirCabeceras: Boolean = false
         private var escribirSiNoExiste: Boolean = false
-        private var fuenteDatos: FuenteDatos? = null
+        private var fuenteItems: FuenteItems<Item>? = null
         private var listaCabeceras: List<String>? = null
         private var separador = ","
 
@@ -136,10 +133,10 @@ class BufferedWriterCSV: IBufferedWriterAsync {
          * Objeto del que extraeremos los datos para
          * guardarlos en el archivo CSV
          *
-         * @param fuenteDatos: Fuente de datos
+         * @param fuenteItems: Fuente de datos
          */
-        fun obtenerDatosDe(fuenteDatos: FuenteDatos): Builder {
-            this.fuenteDatos = fuenteDatos
+        fun obtenerDatosDe(fuenteItems: FuenteItems<Item>): Builder {
+            this.fuenteItems = fuenteItems
             return this
         }
 
@@ -161,7 +158,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
          */
         fun build(): BufferedWriterCSV? {
 
-            if(rutaArchivo != null && fuenteDatos != null){
+            if(rutaArchivo != null && fuenteItems != null){
 
                 // Comprobamos si existe el archivo para escribir las cabeceras o no
                 if (escribirSiNoExiste){
@@ -170,7 +167,13 @@ class BufferedWriterCSV: IBufferedWriterAsync {
                     }
                 }
 
-                return BufferedWriterCSV(this.fuenteDatos, this.rutaArchivo, this.escribirCabeceras, this.separador, this.listaCabeceras)
+                // Si tenemos que escribir las cabeceras pero no tenemos
+                // una lista de cabeceras, las cogeremos de la fuente de datos
+                if (listaCabeceras == null){
+                    listaCabeceras = this.fuenteItems!!.obtenerCabeceras()
+                }
+
+                return BufferedWriterCSV(this.fuenteItems, this.rutaArchivo, this.escribirCabeceras, this.separador, this.listaCabeceras)
             }
             return null
         }
@@ -179,7 +182,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
 
 
     /**
-     * Guardamos los datos almacenados en la [fuenteDatos]
+     * Guardamos los datos almacenados en la [fuenteItems]
      * en el archivo con ruta [archivo]
      */
     override fun guardar() = runBlocking {
@@ -196,7 +199,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     }
 
     /**
-     * Guardamos los datos almacenados en la [fuenteDatos]
+     * Guardamos los datos almacenados en la [fuenteItems]
      * en el archivo con ruta [archivo] de forma asíncrona
      *
      * @param guardadoAsyncListener: Listener por el que comunicaremos el comienzo,finalización y errores del guardado
@@ -234,7 +237,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     }
 
     /**
-     * Guardamos los datos almacenados en la [fuenteDatos]
+     * Guardamos los datos almacenados en la [fuenteItems]
      * en el archivo con ruta [archivo] de forma asíncrona
      *
      * @param guardadoComenzado: Funcion que se llamará una vez comience el guardado
@@ -267,7 +270,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     var guardados = 0
     var mostrarCada = 50000
     /**
-     * Escribimos toda la informacion de la [fuenteDatos] en
+     * Escribimos toda la informacion de la [fuenteItems] en
      * el archivo CSV con ruta [archivo]
      *
      * @param contexto: Contexto bajo el que se ejecutará el guardado
@@ -275,7 +278,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
     private suspend fun escribir(contexto: CoroutineContext) = withContext(contexto){
 
         // Comprobamos que haya una fuente de datos y un buffer
-        if (fuenteDatos != null && bufferedWriter != null){
+        if (fuenteItems != null && bufferedWriter != null){
 
             // Comprobamos que haya que escribir las cabeceras y estas no hayan sido ya escritas
             if (!cabeceraEscrita && escribirCabeceras && listaDeCabeceras != null){
@@ -290,7 +293,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
             }
 
             // Comprobamos que el guardado no se halla cancelado|pausado y haya filas por escribir
-            while (!cancelado && fuenteDatos!!.hayMasFilas()){
+            while (!cancelado && fuenteItems!!.hayMasFilas()){
 
                 // TODO
                 guardados++
@@ -299,8 +302,9 @@ class BufferedWriterCSV: IBufferedWriterAsync {
                 }
 
                 // Escribimos el cuerpo del CSV
-                var fila = fuenteDatos!!.siguienteFila()
+                var fila = fuenteItems!!.siguienteFila()
                 var cuerpo = ""
+
                 for (i in 0 until fila!!.size - 1){
                     cuerpo += fila.get(i) + separador
                 }
@@ -319,7 +323,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
             }
 
             // Terminamos el guardado de los datos
-            if (cancelado || !fuenteDatos!!.hayMasFilas()){
+            if (cancelado || !fuenteItems!!.hayMasFilas()){
                 guardadoTerminado()
             }
         }
@@ -328,36 +332,33 @@ class BufferedWriterCSV: IBufferedWriterAsync {
 
 
     override fun pausarGuardado() {
-        pausado = true
+        if(guardando && !pausado){
+            pausado = true
+            guardando = false
+        }
     }
 
     override fun reanudarGuardado() {
 
-        // Deshabilitamos el pausado
-        pausado = false
+        if(!guardando && pausado){
 
-        if (continuacion != null){
-            continuacion!!.resume(Unit)
-        }
+            // Deshabilitamos el pausado
+            pausado = false
+            guardando = true
 
-        // Guardado asíncrono
-        /*if (scope != null){
-
-            scope!!.launch {
-                guardar(coroutineContext)
+            // Continuamos el guardado en la coroutina que
+            // estuviese ejecutándose
+            if (continuacion != null){
+                continuacion!!.resume(Unit)
             }
         }
-
-        // Guardado síncrono
-        else {
-            runBlocking {
-                guardar(coroutineContext)
-            }
-        }*/
     }
 
     override fun cancelarGuardado() {
-        cancelado = true
+
+        if(!cancelado){
+            cancelado = true
+        }
     }
 
     override fun esperarHastaFinalizacion() {
@@ -367,6 +368,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
             }
         }
     }
+
 
     /**
      * Realizamos una serie de comprobaciones antes de comenzar
@@ -381,7 +383,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
         if (!guardando && !cancelado){
 
             // Comprobamos que haya una fuente de datos
-            if (fuenteDatos != null){
+            if (fuenteItems != null){
 
                 return true
             }
@@ -401,6 +403,7 @@ class BufferedWriterCSV: IBufferedWriterAsync {
         // Cerramos el buffer
         if (bufferedWriter != null){
 
+            bufferedWriter!!.flush()
             bufferedWriter!!.close()
             bufferedWriter = null
         }

@@ -1,27 +1,25 @@
 package Common.Controlador.BufferedWriter
 
-import Common.Controlador.Item.ItemPruebaDos
-import KFoot.DEBUG
+import Common.Modelo.ItemPruebaDos
 import KFoot.Utils
 import io.reactivex.Observable
 import io.reactivex.disposables.Disposable
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import lib.Common.Controlador.BufferedWriter.BufferedWriterCSV
 import lib.Common.Controlador.BufferedWriter.GuardadoAsyncListener
-import lib.Common.Modelo.FuenteDatos
+import lib.Common.Controlador.Item.Item
+import lib.Common.Modelo.FuenteItems
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.function.Executable
-import tech.tablesaw.api.IntColumn
-import tech.tablesaw.api.StringColumn
-import tech.tablesaw.api.Table
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
 import java.util.concurrent.TimeUnit
-import java.util.logging.Logger
 
 class BufferedWriterCSVTest {
 
@@ -55,7 +53,7 @@ class BufferedWriterCSVTest {
             if (vigiliarRam){
                 observableRam = Observable.interval(1,TimeUnit.SECONDS)
                 disposable = observableRam!!.subscribe {
-                    println("Memoria RAM usada: ${Utils.memoriaUsada()/1024/1024}MB")
+                    println("Utilizando ${Utils.memoriaUsada()}MB de memoria RAM")
                 }
             }
         }
@@ -64,29 +62,17 @@ class BufferedWriterCSVTest {
     @Test
     fun escribe_en_el_archivo_de_forma_sincrona(){
 
-        val table = Table.create("Tabla")
+        val fuente = FuenteItems<ItemPruebaDos>(ItemPruebaDos())
+        val totalAnadir = 4
 
-        val idColum = IntColumn.create("Id")
-        val nombreColum = StringColumn.create("Nombre")
-
-        with(table){
-            addColumns(idColum)
-            addColumns(nombreColum)
+        for (i in 0 until totalAnadir){
+            fuente.anadirItem(ItemPruebaDos(i, i))
         }
-
-        table.column("Id").appendCell("1")
-        table.column("Id").appendCell("2")
-        table.column("Id").appendCell("3")
-
-        table.column("Nombre").appendCell("Pepe")
-        table.column("Nombre").appendCell("Juan")
-
-        val fuente = FuenteDatos()
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)
                 .escribirCabeceras(true)
-                .obtenerDatosDe(fuente)
+                .obtenerDatosDe(fuente as FuenteItems<Item>)
                 .build()
 
         if (bufferedWriterCSV != null){
@@ -106,26 +92,19 @@ class BufferedWriterCSVTest {
     @Test
     fun escribe_en_el_archivo_de_forma_asincrona(){
 
-        val table = Table.create("Tabla")
+        val fuente = FuenteItems<ItemPruebaDos>(ItemPruebaDos())
+        val tuplasAInsertar = 500000
 
-        val tuplasAInsertar = 400000
-
-        val fuente = FuenteDatos()
 
         for (i in 0 until tuplasAInsertar){
-
-            if (i % 5000 == 0){
-                println(i)
-            }
-
-            fuente.anadirItem(ItemPruebaDos(i,i))
+            fuente.anadirItem(ItemPruebaDos(i, i))
         }
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)
                 .escribirCabeceras(true)
                 .listaDeCabeceras(ItemPruebaDos().obtenerNombreAtributos())
-                .obtenerDatosDe(fuente)
+                .obtenerDatosDe(fuente as FuenteItems<Item>)
                 .build()
 
         if (bufferedWriterCSV != null){
@@ -160,29 +139,17 @@ class BufferedWriterCSVTest {
                     Executable { Assertions.assertEquals(tuplasAInsertar + 1,f.readLines().size) }
             )
         }
-
     }
 
     @Test
     fun la_pausa_se_realiza_correctamente(){
 
+        val fuente = FuenteItems<Item>(ItemPruebaDos())
         val tuplasAInsertar = 1000000
 
-        val table = Table.create("Tabla")
-
-        val idColum = IntColumn.create("Id")
-        val nombreColum = StringColumn.create("Nombre")
-
-        with(table){
-            addColumns(idColum)
-            addColumns(nombreColum)
-        }
-
         for (i in 0 until tuplasAInsertar){
-            table.column("Id").appendCell(i.toString())
+            fuente.anadirItem(ItemPruebaDos(i, i))
         }
-
-        val fuente = FuenteDatos()
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)
@@ -224,28 +191,22 @@ class BufferedWriterCSVTest {
 
             Assertions.assertEquals(totalLineas,totalLineas)
         }
+
+        else {
+            assert(true == false)
+        }
     }
 
     @Test
     fun se_cancela_el_guardado_correctamente(){
 
-        val tuplasAInsertar = 2000000
+        val fuente = FuenteItems<Item>(ItemPruebaDos())
+        val tuplasAInsertar = 1000000
 
-        val table = Table.create("Tabla")
-
-        val idColum = IntColumn.create("Id")
-        val nombreColum = StringColumn.create("Nombre")
-
-        with(table){
-            addColumns(idColum)
-            addColumns(nombreColum)
-        }
 
         for (i in 0 until tuplasAInsertar){
-            table.column("Id").appendCell(i.toString())
+            fuente.anadirItem(ItemPruebaDos(i,i))
         }
-
-        val fuente = FuenteDatos()
 
         val bufferedWriterCSV = BufferedWriterCSV.Builder()
                 .guardarEn(rutaArchivoPrueba)
@@ -287,6 +248,10 @@ class BufferedWriterCSVTest {
 
             println("Total: $tuplasAInsertar -- Insertadas: $totalLineas")
             assert(totalLineas < tuplasAInsertar)
+        }
+
+        else {
+            assert(true == false)
         }
     }
 }
