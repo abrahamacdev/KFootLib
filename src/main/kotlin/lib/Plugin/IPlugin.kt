@@ -20,26 +20,38 @@ interface IPlugin {
         /**
          * Este método será al que llamará la plataforma para comenzar
          * la ejecución del plugin
+         *
+         * @param onIniciarPluginListener: Callback por el que transmitiremos el inicio del plugin
+         * ,o por contra, el error que no nos ha permitido realizar la ejecución
          */
         fun onIniciar(onIniciarPluginListener: onIniciarPluginListener? = null)
 
         /**
          * Servirá para comunicar al plugin que debe de pausar
          * su ejecución
+         *
+         * @param onPausarPluginListener: Callback por el que transmitiremos el correcto pausado
+         * del plugin, o por contra, el error que no nos ha permitido realizar el pausado
          */
-        fun onPausar()
+        fun onPausar(onPausarPluginListener: onPausarPluginListener? = null)
 
         /**
          * Servirá para comunicar al plugin que puede retomar
          * su ejecución después de haber sido pausada
+         *
+         * @param onReanudarPluginListener: Callback por el que transmitiremos el correcto reanudado
+         * del plugin, o por contra, el error que no nos ha permitido reanudar la ejecución
          */
-        fun onReanudar()
+        fun onReanudar(onReanudarPluginListener: onReanudarPluginListener? = null)
 
         /**
          * Servirá para comunicar al plugin que debe de cancelar
          * su ejecución
+         *
+         * @param onCancelarPluginListener: Callback por el que transmitiremos la cancelación
+         * del plugin, o por contra, el error que no nos ha permitido cancelar la ejecución
          */
-        fun onCancelar()
+        fun onCancelar(onCancelarPluginListener: onCancelarPluginListener? = null)
     }
 
     /**
