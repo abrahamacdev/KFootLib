@@ -9,7 +9,7 @@ interface IPlugin {
      * la plataforma y los plugins, de esta forma podremos alterar
      * la ejecución del plugin y este avisar de algunos estados
      */
-    fun sincronizar(onAvisosPluginListener: onAvisosPluginListener? = null): onControlPluginListener
+    fun sincronizar(onAvisosPluginListener: onAvisosPluginListener): onControlPluginListener
 
 
     /**
